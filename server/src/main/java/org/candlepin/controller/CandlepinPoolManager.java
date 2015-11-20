@@ -371,15 +371,15 @@ public class CandlepinPoolManager implements PoolManager {
         log.info("Refreshing products for {} subscriptions.", subs.size());
 
         for (Subscription sub : subs) {
-            this.addProductToMap(products, sub.getProduct());
-            this.addProductToMap(products, sub.getDerivedProduct());
+            this.addProductToMap(o, products, sub.getProduct());
+            this.addProductToMap(o, products, sub.getDerivedProduct());
 
             for (Product product : sub.getProvidedProducts()) {
-                this.addProductToMap(products, product);
+                this.addProductToMap(o, products, product);
             }
 
             for (Product product : sub.getDerivedProvidedProducts()) {
-                this.addProductToMap(products, product);
+                this.addProductToMap(o, products, product);
             }
         }
 
@@ -410,7 +410,7 @@ public class CandlepinPoolManager implements PoolManager {
         return changed;
     }
 
-    private void addProductToMap(Map<String, Product> productMap, Product product) {
+    private void addProductToMap(Owner owner, Map<String, Product> productMap, Product product) {
         if (product != null) {
             // Check that the product hasn't changed if we've already seen it.
             Product existing = productMap.get(product.getId());
@@ -422,6 +422,7 @@ public class CandlepinPoolManager implements PoolManager {
                 );
             }
 
+            product.setOwner(owner);
             productMap.put(product.getId(), product);
         }
     }
