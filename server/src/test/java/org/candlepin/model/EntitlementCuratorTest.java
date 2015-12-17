@@ -25,6 +25,7 @@ import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -151,7 +152,7 @@ public class EntitlementCuratorTest extends DatabaseTestFixture {
         entitlementCurator.create(ent);
 
         // The ent we just created should *not* be returned as modifying itself:
-        Set<Entitlement> ents = entitlementCurator.listModifying(ent);
+        Set<Entitlement> ents = entitlementCurator.listModifying(Collections.singletonList(ent));
         assertEquals(0, ents.size());
     }
 

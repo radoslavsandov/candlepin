@@ -23,7 +23,10 @@ import com.google.inject.persist.Transactional;
 
 import org.hibernate.Criteria;
 import org.hibernate.ReplicationMode;
+import org.hibernate.criterion.Conjunction;
 import org.hibernate.criterion.CriteriaSpecification;
+import org.hibernate.criterion.Criterion;
+import org.hibernate.criterion.Disjunction;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
 import org.hibernate.sql.JoinType;
@@ -191,51 +194,65 @@ public class EntitlementCurator extends AbstractHibernateCurator<Entitlement> {
      * Creates date filtering criteria to for checking if an entitlement has any overlap
      * with a "modifying" entitlement that has just been granted.
      */
-    private Criteria createModifiesDateFilteringCriteria(Consumer consumer, Date startDate,
+    private Criterion createModifiesDateFilteringCriteria(Consumer consumer, Date startDate,
         Date endDate, Entitlement excludeEnt) {
-        Criteria criteria = currentSession().createCriteria(Entitlement.class)
-            .add(Restrictions.eq("consumer", consumer));
 
+        Conjunction criteria = Restrictions.conjunction();
+
+
+        criteria.add(Restrictions.eq("consumer", consumer));
+
+        // TODO: Move outside
         if (excludeEnt != null) {
-            criteria = criteria.add(Restrictions.ne("id", excludeEnt.getId()));
+            criteria.add(Restrictions.ne("id", excludeEnt.getId()));
         }
 
-        criteria = criteria.createCriteria("pool")
-                .add(Restrictions.or(
+//        criteria = criteria.createCriteria("pool")
+                criteria.add(Restrictions.or(
                     // Dates overlap if the start or end date is in our range
                     Restrictions.or(
-                        Restrictions.between("startDate", startDate, endDate),
-                        Restrictions.between("endDate", startDate, endDate)),
+                        Restrictions.between("pool.startDate", startDate, endDate),
+                        Restrictions.between("pool.endDate", startDate, endDate)),
                     Restrictions.and(
                         // The dates overlap if our range is completely encapsulated
-                        Restrictions.le("startDate", startDate),
-                        Restrictions.ge("endDate", endDate))));
+                        Restrictions.le("pool.startDate", startDate),
+                        Restrictions.ge("pool.endDate", endDate))));
         return criteria;
     }
 
-    public Set<Entitlement> listModifying(Entitlement entitlement) {
+    public Set<Entitlement> listModifying(List<Entitlement> entitlements) {
         Set<Entitlement> modifying = new HashSet<Entitlement>();
 
         // Get the map of product Ids to the set of
         // overlapping entitlements that provide them
-        Map<String, Set<Entitlement>> pidEnts = getOverlappingForModifying(entitlement);
+        Map<String, Set<Entitlement>> pidEnts = getOverlappingForModifying(entitlements);
+
         if (pidEnts.isEmpty()) {
             // Empty collections break hibernate queries
             return modifying;
         }
+
         // Retrieve all products at once from the adapter
         List<Product> products = productAdapter.getProductsByIds(pidEnts.keySet());
-        for (Product p : products) {
-            boolean modifies = p.modifies(entitlement.getProductId());
-            Iterator<ProvidedProduct> ppit =
-                entitlement.getPool().getProvidedProducts().iterator();
-            // No need to continue checking once we have found a modified product
-            while (!modifies && ppit.hasNext()) {
-                modifies = modifies || p.modifies(ppit.next().getProductId());
-            }
-            if (modifies) {
-                // Return all entitlements for the modified product
-                modifying.addAll(pidEnts.get(p.getId()));
+
+        for (Entitlement entitlement : entitlements) {
+            for (Product p : products) {
+                boolean modifies = p.modifies(entitlement.getProductId());
+                Iterator<ProvidedProduct> ppit =
+                    entitlement.getPool().getProvidedProducts().iterator();
+                // No need to continue checking once we have found a modified product
+                while (!modifies && ppit.hasNext()) {
+                    modifies = modifies || p.modifies(ppit.next().getProductId());
+                }
+                if (modifies) {
+                    // Return all entitlements for the modified product
+                    for (Entitlement modifiedEnt : pidEnts.get(p.getId())) {
+                        // Ensure that the entitlement is overlapping for the consumer.
+                        if (modifiedEnt.getConsumer().equals(entitlement.getConsumer())) {
+                            modifying.add(modifiedEnt);
+                        }
+                    }
+                }
             }
         }
 
@@ -265,9 +282,17 @@ public class EntitlementCurator extends AbstractHibernateCurator<Entitlement> {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Set<Entitlement>> getOverlappingForModifying(Entitlement e) {
-        List<Entitlement> overlapEnts = createModifiesDateFilteringCriteria(
-            e.getConsumer(), e.getStartDate(), e.getEndDate(), e).list();
+    public Map<String, Set<Entitlement>> getOverlappingForModifying(List<Entitlement> ents) {
+
+        Criteria criteria = currentSession().createCriteria(Entitlement.class)
+            .createAlias("pool", "pool");
+        Disjunction disjunction = Restrictions.disjunction();
+        for (Entitlement e : ents) {
+            disjunction.add(createModifiesDateFilteringCriteria(e.getConsumer(), e.getStartDate(), e.getEndDate(), e));
+        }
+        criteria.add(disjunction);
+
+        List<Entitlement> overlapEnts = criteria.list();
         Map<String, Set<Entitlement>> pidEnts = new HashMap<String, Set<Entitlement>>();
         for (Entitlement ent : overlapEnts) {
             addToMap(pidEnts, ent);
@@ -363,7 +388,7 @@ public class EntitlementCurator extends AbstractHibernateCurator<Entitlement> {
 
         return criteria.list();
     }
-    
+
     /**
      * Batch deletes a list of entitlements. This method is not transactinal
      * because the caller should take responsibility of transaction
@@ -386,7 +411,7 @@ public class EntitlementCurator extends AbstractHibernateCurator<Entitlement> {
             ent.getConsumer().getEntitlements().remove(ent);
         }
     }
-    
+
     @SuppressWarnings("unchecked")
     public List<Entitlement> findByPoolAttribute(String attributeName, String value) {
         return findByPoolAttribute(null, attributeName, value);

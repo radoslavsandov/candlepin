@@ -465,7 +465,7 @@ public class PoolManagerTest {
         int total = manager.revokeAllEntitlements(c);
 
         assertEquals(2, total);
-        verify(entitlementCurator, never()).listModifying(any(Entitlement.class));
+        verify(entitlementCurator, never()).listModifying(any(List.class));
     }
 
     @Test

@@ -894,7 +894,7 @@ public class CandlepinPoolManager implements PoolManager {
         consumerCurator.update(consumer);
 
         handler.handleSelfCertificate(consumer, pool, entitlement, generateUeberCert);
-        for (Entitlement regenEnt : entitlementCurator.listModifying(entitlement)) {
+        for (Entitlement regenEnt : entitlementCurator.listModifying(Collections.singletonList(entitlement))) {
             // Lazily regenerate modified certificates:
             this.regenerateCertificatesOf(regenEnt, generateUeberCert, true);
         }
@@ -1186,7 +1186,7 @@ public class CandlepinPoolManager implements PoolManager {
             // and regenerate those to remove the content sets.
             // Lazy regeneration is ok here.
             this.regenerateCertificatesOf(entitlementCurator
-                .listModifying(entitlement), true);
+                .listModifying(Collections.singletonList(entitlement)), true);
         }
 
         log.info("Revoked entitlement: " + entitlement.getId());
@@ -1275,10 +1275,11 @@ public class CandlepinPoolManager implements PoolManager {
             enforcer.postUnbind(ent.getConsumer(), poolHelper, ent);
         }
 
-        //TODO this will be implemented by mstead
+//        //TODO this will be implemented by mstead
 //        for (Entitlement entitlement : entsToRevoke) {
 //            this.regenerateCertificatesOf(entitlementCurator.listModifying(entitlement), true);
 //        }
+        this.regenerateCertificatesOf(entitlementCurator.listModifying(entsToRevoke), true);
 
         Set<Consumer> distinctConsumers = getDistinctConsumers(entsToRevoke);
 //
@@ -1362,15 +1363,15 @@ public class CandlepinPoolManager implements PoolManager {
     @Override
     @Transactional
     public void deletePools(List<Pool> pools) {
-        
+
         List<Entitlement> entitlementsToRevoke = new ArrayList<Entitlement>();
-        
+
         for (Pool p : pools){
             entitlementsToRevoke.addAll(p.getEntitlements());
         }
-        
+
         revokeEntitlements(entitlementsToRevoke);
-        
+
         poolCurator.batchDelete(pools);
 
         for (Pool pool : pools) {
