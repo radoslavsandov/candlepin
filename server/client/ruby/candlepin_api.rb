@@ -70,7 +70,7 @@ class Candlepin
               owner_key=nil, activation_keys=[], installedProducts=[],
               environment=nil, capabilities=[], hypervisor_id=nil,
               content_tags=[], created_date=nil, last_checkin_date=nil,
-              annotations=nil)
+              annotations=nil, release_ver=nil)
     consumer = {
       :type => {:label => type},
       :name => name,
@@ -89,6 +89,8 @@ class Candlepin
     consumer[:lastCheckin] = last_checkin_date if last_checkin_date
 
     consumer[:annotations] = annotations if annotations
+
+    consumer[:releaseVer] = {:releaseVer => release_ver} if release_ver
 
     if environment.nil?
       path = get_path("consumers") + "?"
@@ -154,6 +156,7 @@ class Candlepin
     consumer[:serviceLevel] = params[:serviceLevel] if params.has_key?(:serviceLevel)
     consumer[:capabilities] = params[:capabilities].collect { |name| {'name' => name} } if params[:capabilities]
     consumer[:hypervisorId] = {:hypervisorId => params[:hypervisorId]} if params[:hypervisorId]
+    consumer[:releaseVer] = {:releaseVer => params[:releaseVer]} if params[:releaseVer]
 
     path = get_path("consumers")
     put("#{path}/#{uuid}", consumer)
@@ -870,6 +873,11 @@ class Candlepin
     query = "/consumers/compliance?"
     query << consumer_ids.map {|uuid| "uuid=#{uuid}"}.join("&")
     get(query)
+  end
+
+  def get_consumer_release(consumer_id=nil)
+    consumer_id ||= @uuid
+    get("/consumers/#{consumer_id}/release")
   end
 
   def get_consumer_host(consumer_id=nil)
