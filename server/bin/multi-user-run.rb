@@ -10,10 +10,7 @@ CP_PORT = 8443
 CP_ADMIN_USER = "admin"
 CP_ADMIN_PASS = "admin"
 
-PER_USER_RUN_COUNT=100
-
-
-$logger = Logger.new(File.open('multi-user-run.log', File::WRONLY | File::CREAT))
+PER_USER_RUN_COUNT=250
 
 
 def random_string prefix=nil
@@ -33,7 +30,8 @@ end
 class BaseAction
   attr_reader :title, :options
 
-  def initialize()
+  def initialize(logger)
+    @logger = logger
     @title = "NOT SET"
     @options = []
   end
@@ -45,7 +43,8 @@ end
 
 class ListPoolsAction < BaseAction
 
-  def initialize()
+  def initialize(logger)
+    super(logger)
     @title = "List Pools"
     @options = [
       config("admin", "admin", "admin"),
@@ -56,7 +55,7 @@ class ListPoolsAction < BaseAction
 
   def run(client, option)
     pools = client.list_pools(:owner => option[:owner])
-    $logger.info("Found pools for #{option[:username]}: #{pools.size}")
+    @logger.info("Found pools for #{option[:username]}: #{pools.size}")
   end
 
   private
@@ -71,7 +70,8 @@ end
 
 class ShowOwnerAction < BaseAction
 
-  def initialize()
+  def initialize(logger)
+    super(logger)
     @title = "Show Owner"
     @options = [
       config("admin", "admin", "admin"),
@@ -83,7 +83,7 @@ class ShowOwnerAction < BaseAction
   def run(client, option)
     owner_key = option[:owner]
     owner = client.get_owner(owner_key)
-    $logger.info("Found owner #{owner_key}")
+    @logger.info("Found owner #{owner_key}")
   end
 
   private
@@ -96,15 +96,15 @@ end
 
 class ShowOwnerInfoAction < ShowOwnerAction
 
-  def initialize
-    super()
+  def initialize(logger)
+    super(logger)
     @title = "Show Owner Info"
   end
 
   def run(client, option)
     owner_key = option[:owner]
     owner = client.get_owner_info(owner_key)
-    $logger.info("Found owner info for #{owner_key}")
+    @logger.info("Found owner info for #{owner_key}")
   end
 
 end
@@ -112,23 +112,23 @@ end
 
 class ListOwnerPoolsAction < ShowOwnerAction
 
-  def initialize
-    super()
+  def initialize(logger)
+    super(logger)
     @title = "List Owner Pools"
   end
 
   def run(client, option)
     owner_key = option[:owner]
     pools = client.list_owner_pools(owner_key)
-    $logger.info("Found #{pools.size} pools for owner #{owner_key}.")
+    @logger.info("Found #{pools.size} pools for owner #{owner_key}.")
   end
 end
 
 
 class ListOwnerSubscriptionsAction < ShowOwnerAction
 
-  def initialize
-    super()
+  def initialize(logger)
+    super(logger)
     @title = "List Owner Subscriptions"
     @options = [
       config("admin", "admin", "admin"),
@@ -140,15 +140,15 @@ class ListOwnerSubscriptionsAction < ShowOwnerAction
   def run(client, option)
     owner_key = option[:owner]
     subs = client.list_subscriptions(owner_key)
-    $logger.info("Found #{subs.size} subscriptions for owner #{owner_key}.")
+    @logger.info("Found #{subs.size} subscriptions for owner #{owner_key}.")
   end
 end
 
 
 class CreateConsumerAction < BaseAction
 
-  def initialize
-    super()
+  def initialize(logger)
+    super(logger)
     @admin = user_client("admin", "admin")
     @title = "Create Consumer"
     @options = [
@@ -161,7 +161,7 @@ class CreateConsumerAction < BaseAction
   def run(user_client, option)
     owner = option[:owner]
     consumer = create_consumer(owner)
-    $logger.info("Created consumer #{consumer['uuid']} in org #{owner}")
+    @logger.info("Created consumer #{consumer['uuid']} in org #{owner}")
   end
 
   def config(username, password, owner)
@@ -184,15 +184,15 @@ end
 
 class ShowConsumerInfoAction < CreateConsumerAction
 
-  def initialize
-    super()
+  def initialize(logger)
+    super(logger)
     @title = "List Consumer info"
   end
 
   def run(client, option)
     consumer = client.get_consumer(option[:consumer])
     uuid = consumer["uuid"]
-    $logger.info("User #{option[:username]} found consumer #{uuid}")
+    @logger.info("User #{option[:username]} found consumer #{uuid}")
   end
 
 
@@ -213,11 +213,11 @@ class ShowConsumerInfoAction < CreateConsumerAction
   # Cleanup all consumers of the org to free available
   # entitlements from the pools.
   def cleanup(owner)
-    $logger.info("Unregistering consumers of org #{owner}")
+    @logger.info("Unregistering consumers of org #{owner}")
     consumers = @admin.list_consumers(:owner => owner)
     consumers.each do |consumer|
       uuid = consumer["uuid"]
-      $logger.info("--> Unregistering consumer #{uuid}")
+      @logger.info("--> Unregistering consumer #{uuid}")
       @admin.unregister(uuid)
     end
   end
@@ -227,15 +227,15 @@ end
 
 class GetConsumerCertificateSerialsAction < ShowConsumerInfoAction
 
-  def initialize()
-    super()
+  def initialize(logger)
+    super(logger)
     @title = "Get Consumer Cert Serials"
   end
 
   def run(user_client, option)
     consumer_cp = option[:consumer_client]
     serials = consumer_cp.list_certificate_serials
-    $logger.info("Found #{serials.size} serials for consumer #{option[:consumer]}")
+    @logger.info("Found #{serials.size} serials for consumer #{option[:consumer]}")
   end
 
 
@@ -256,28 +256,28 @@ end
 
 class GetConsumerReleaseAction < ShowConsumerInfoAction
 
-  def initialize
-    super()
+  def initialize(logger)
+    super(logger)
     @title = "List Consumer Release"
   end
 
   def run(user_client, option)
     consumer = option[:consumer_client]
     release = consumer.get_consumer_release()
-    $logger.info("Release Version for #{consumer.uuid}: #{release['releaseVer'] ||= 'Not Set'}")
+    @logger.info("Release Version for #{consumer.uuid}: #{release['releaseVer'] ||= 'Not Set'}")
   end
 
 end
 
 
-def create_runner_thread(action, option)
+def create_runner_thread(action, option, logger)
   return Thread.new do
     cp = user_client(option[:username], option[:password])
     for i in 1..PER_USER_RUN_COUNT
       begin
         action.run(cp, option)
       rescue => ex
-        $logger.info("An error of type #{ex.class} happened, message is #{ex.message}")
+        logger.info("An error of type #{ex.class} happened, message is #{ex.message}")
       end
     end
   end
@@ -299,15 +299,21 @@ actions = [
 #  ShowConsumerInfoAction
 #]
 
+def get_log_time
+  Time.now.strftime("%d-%m-%Y-%H.%M")
+end
+
+log_time = get_log_time()
 actions.each do |action_class|
-  $logger.info("Running action: #{action_class}")
-  $logger.info("Initializing action")
-  action = action_class.new
-  $logger.info("Running #{PER_USER_RUN_COUNT} times for #{action.options.size} users.")
+  logger = Logger.new(File.open("#{action_class}-#{log_time}.log", File::WRONLY | File::CREAT))
+  logger.info("Running action: #{action_class}")
+  logger.info("Initializing action")
+  action = action_class.new(logger)
+  logger.info("Running #{PER_USER_RUN_COUNT} times for #{action.options.size} users.")
 
   all_runners = []
   action.options.each do |option|
-    all_runners << create_runner_thread(action, option)
+    all_runners << create_runner_thread(action, option, logger)
   end
 
   Benchmark.bm(14) do |bench|
