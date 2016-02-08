@@ -26,6 +26,7 @@ import com.google.inject.Injector;
 import com.google.inject.persist.Transactional;
 
 import org.hibernate.Criteria;
+import org.hibernate.FetchMode;
 import org.hibernate.Filter;
 import org.hibernate.LockOptions;
 import org.hibernate.Query;
@@ -48,6 +49,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+
+import javax.persistence.FetchType;
 
 /**
  * EntitlementPoolCurator
@@ -213,6 +216,8 @@ public class PoolCurator extends AbstractHibernateCurator<Pool> {
 
         Criteria crit = createSecureCriteria()
             .createAlias("product", "product")
+            .setFetchMode("providedProducts", FetchMode.JOIN)
+            .setFetchMode("derivedProvidedProducts", FetchMode.JOIN)
             .setResultTransformer(Criteria.DISTINCT_ROOT_ENTITY);
 
         if (activeOnly) {

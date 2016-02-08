@@ -10,7 +10,7 @@ CP_PORT = 8443
 CP_ADMIN_USER = "admin"
 CP_ADMIN_PASS = "admin"
 
-PER_USER_RUN_COUNT=250
+PER_USER_RUN_COUNT=100
 
 
 def random_string prefix=nil
@@ -284,15 +284,15 @@ def create_runner_thread(action, option, logger)
 end
 
 actions = [
-  ListPoolsAction,
-  ShowOwnerAction,
-  ShowOwnerInfoAction,
+  #ListPoolsAction,
+  #ShowOwnerAction,
+  #ShowOwnerInfoAction,
   ListOwnerPoolsAction,
-  ListOwnerSubscriptionsAction,
-  CreateConsumerAction,
-  ShowConsumerInfoAction,
-  GetConsumerCertificateSerialsAction,
-  GetConsumerReleaseAction
+  #ListOwnerSubscriptionsAction,
+  #CreateConsumerAction,
+  #ShowConsumerInfoAction,
+  #GetConsumerCertificateSerialsAction,
+  #GetConsumerReleaseAction
 ]
 
 #actions = [
