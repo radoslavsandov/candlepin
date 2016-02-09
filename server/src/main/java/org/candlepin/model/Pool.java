@@ -25,6 +25,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.commons.lang.StringUtils;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Cascade;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.LazyCollection;
@@ -256,7 +258,7 @@ public class Pool extends AbstractHibernateObject implements Persisted, Owned, N
         joinColumns = {@JoinColumn(name = "pool_id", insertable = false, updatable = false)},
         inverseJoinColumns = {@JoinColumn(name = "product_uuid")}
     )
-    @BatchSize(size = 1000)
+    @Fetch(FetchMode.JOIN)
     private Set<Product> providedProducts = new HashSet<Product>();
 
     @ManyToMany
@@ -265,7 +267,7 @@ public class Pool extends AbstractHibernateObject implements Persisted, Owned, N
         joinColumns = {@JoinColumn(name = "pool_id", insertable = false, updatable = false)},
         inverseJoinColumns = {@JoinColumn(name = "product_uuid")}
     )
-    @BatchSize(size = 1000)
+    @Fetch(FetchMode.JOIN)
     private Set<Product> derivedProvidedProducts = new HashSet<Product>();
 
     /**

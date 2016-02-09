@@ -216,8 +216,6 @@ public class PoolCurator extends AbstractHibernateCurator<Pool> {
 
         Criteria crit = createSecureCriteria()
             .createAlias("product", "product")
-            .setFetchMode("providedProducts", FetchMode.JOIN)
-            .setFetchMode("derivedProvidedProducts", FetchMode.JOIN)
             .setResultTransformer(Criteria.DISTINCT_ROOT_ENTITY);
 
         if (activeOnly) {
