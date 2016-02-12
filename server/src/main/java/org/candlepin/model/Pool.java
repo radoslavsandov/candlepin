@@ -20,6 +20,7 @@ import org.candlepin.util.DateSource;
 
 import com.fasterxml.jackson.annotation.JsonFilter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import org.apache.commons.lang.StringUtils;
@@ -246,10 +247,12 @@ public class Pool extends AbstractHibernateObject implements Persisted, Owned, N
     @ManyToOne
     @JoinColumn(name = "product_uuid", nullable = false)
     @NotNull
+    @JsonIgnoreProperties({ "productContent", "dependentProductIds" })
     private Product product;
 
     @ManyToOne
     @JoinColumn(name = "derived_product_uuid")
+    @JsonIgnoreProperties({ "productContent", "dependentProductIds" })
     private Product derivedProduct;
 
     @ManyToMany
@@ -259,6 +262,7 @@ public class Pool extends AbstractHibernateObject implements Persisted, Owned, N
         inverseJoinColumns = {@JoinColumn(name = "product_uuid")}
     )
     @Fetch(FetchMode.JOIN)
+    @JsonIgnoreProperties({ "productContent", "dependentProductIds" })
     private Set<Product> providedProducts = new HashSet<Product>();
 
     @ManyToMany
@@ -268,6 +272,7 @@ public class Pool extends AbstractHibernateObject implements Persisted, Owned, N
         inverseJoinColumns = {@JoinColumn(name = "product_uuid")}
     )
     @Fetch(FetchMode.JOIN)
+    @JsonIgnoreProperties({ "productContent", "dependentProductIds" })
     private Set<Product> derivedProvidedProducts = new HashSet<Product>();
 
     /**
@@ -323,7 +328,7 @@ public class Pool extends AbstractHibernateObject implements Persisted, Owned, N
         inverseJoinColumns = @JoinColumn(name = "branding_id"))
     @Cascade({org.hibernate.annotations.CascadeType.ALL,
         org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
-    @BatchSize(size = 1000)
+    @Fetch(FetchMode.JOIN)
     private Set<Branding> branding = new HashSet<Branding>();
 
     @Version
