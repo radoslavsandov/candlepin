@@ -294,7 +294,7 @@ public class Pool extends AbstractHibernateObject implements Persisted, Owned, N
     @OneToMany(mappedBy = "pool")
     @Cascade({org.hibernate.annotations.CascadeType.ALL,
         org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
-    @BatchSize(size = 1000)
+    @Fetch(FetchMode.JOIN)
     private Set<PoolAttribute> attributes = new HashSet<PoolAttribute>();
 
     @OneToMany(mappedBy = "pool", cascade = CascadeType.ALL)
