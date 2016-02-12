@@ -16,6 +16,7 @@
 package org.candlepin.model;
 
 import com.fasterxml.jackson.annotation.JsonFilter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
@@ -60,6 +61,7 @@ public class ProductAttribute extends AbstractHibernateObject implements Attribu
     @ManyToOne
     @JoinColumn(name = "product_uuid", nullable = false)
     @NotNull
+    @JsonIgnore
     private Product product;
 
 

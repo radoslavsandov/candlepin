@@ -10,7 +10,7 @@ CP_PORT = 8443
 CP_ADMIN_USER = "admin"
 CP_ADMIN_PASS = "admin"
 
-PER_USER_RUN_COUNT=100
+PER_USER_RUN_COUNT=250
 
 
 def random_string prefix=nil
