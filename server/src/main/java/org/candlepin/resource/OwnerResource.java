@@ -14,6 +14,7 @@
  */
 package org.candlepin.resource;
 
+import org.candlepin.api.dto.PoolDTO;
 import org.candlepin.audit.Event;
 import org.candlepin.audit.Event.Target;
 import org.candlepin.audit.Event.Type;
@@ -767,6 +768,29 @@ public class OwnerResource {
         @Context Principal principal,
         @Context PageRequest pageRequest) {
 
+
+        Page<List<Pool>> page = getPoolListing(ownerKey, consumerUuid, activationKeyName, productId,
+                subscriptionId, listAll, activeOn, matches, attrFilters, principal, pageRequest);
+
+
+        // Store the page for the LinkHeaderResponseFilter
+        ResteasyProviderFactory.pushContext(Page.class, page);
+        return page.getPageData();
+    }
+
+    private Page<List<Pool>> getPoolListing(
+        String ownerKey,
+        String consumerUuid,
+        String activationKeyName,
+        String productId,
+        String subscriptionId,
+        boolean listAll,
+        String activeOn,
+        String matches,
+        List<KeyValueParameter> attrFilters,
+        Principal principal,
+        PageRequest pageRequest) {
+
         Owner owner = findOwner(ownerKey);
 
         Date activeOnDate = new Date();
@@ -818,10 +842,42 @@ public class OwnerResource {
         List<Pool> poolList = page.getPageData();
         calculatedAttributesUtil.setCalculatedAttributes(poolList, activeOnDate);
         calculatedAttributesUtil.setQuantityAttributes(poolList, c, activeOnDate);
+        return page;
+    }
+
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("{owner_key}/pools_list")
+    @Paginate
+    public List<PoolDTO> listDtoPools(
+        @PathParam("owner_key")
+        @Verify(value = Owner.class, subResource = SubResource.POOLS) String ownerKey,
+        @QueryParam("consumer") String consumerUuid,
+        @QueryParam("activation_key") String activationKeyName,
+        @QueryParam("product") String productId,
+        @QueryParam("subscription") String subscriptionId,
+        @QueryParam("listall") @DefaultValue("false") boolean listAll,
+        @QueryParam("activeon") String activeOn,
+        @QueryParam("matches") String matches,
+        @QueryParam("attribute") @CandlepinParam(type = KeyValueParameter.class)
+            List<KeyValueParameter> attrFilters,
+        @Context Principal principal,
+        @Context PageRequest pageRequest) {
+
+        Page<List<Pool>> page = getPoolListing(ownerKey, consumerUuid, activationKeyName, productId,
+                subscriptionId, listAll, activeOn, matches, attrFilters, principal, pageRequest);
+
+        Page<List<PoolDTO>> ret = new Page<List<PoolDTO>>();
+        ret.setMaxRecords(page.getMaxRecords());
+        ret.setPageData(new LinkedList<PoolDTO>());
+        ret.setPageRequest(page.getPageRequest());
+        for(Pool p : page.getPageData()) {
+            ret.getPageData().add(new PoolDTO(p));
+        }
 
         // Store the page for the LinkHeaderResponseFilter
-        ResteasyProviderFactory.pushContext(Page.class, page);
-        return poolList;
+        ResteasyProviderFactory.pushContext(Page.class, ret);
+        return ret.getPageData();
     }
 
     /**
