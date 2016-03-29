@@ -176,6 +176,7 @@ public class Entitler {
      */
     public List<Entitlement> bindByProducts(AutobindData data, boolean force) {
         Consumer consumer = data.getConsumer();
+        consumerCurator.lockAndLoad(consumer);
         // If the consumer is a guest, and has a host, try to heal the host first
         // Dev consumers should not need to worry about the host or unmapped guest
         // entitlements based on the planned design of the subscriptions

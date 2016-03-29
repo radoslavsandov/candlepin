@@ -127,6 +127,10 @@ describe 'Job Status' do
     job = system.consume_product(@monitoring.id, { :async => true })
     status = @user.get_job(job['id'])
     status['id'].should == job['id']
+
+    #status = wait_for_job(job['id'], 5)
+    #status['id'].should == job['id']
+    #status['state'].should == 'FINISHED'
   end
 
   it 'should not allow user to view job status outside of managed org' do
