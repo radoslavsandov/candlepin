@@ -1522,14 +1522,9 @@ public class OwnerResourceTest extends DatabaseTestFixture {
             ucg, null, null, null, null, null, null, null, productManager, contentManager
         );
 
-        try {
-            when(oc.lookupByKey(eq("admin"))).thenReturn(owner);
-            when(cc.findByName(eq(owner), eq(Consumer.UEBER_CERT_CONSUMER))).thenReturn(null);
-            when(ucg.generate(eq(owner), eq(principal))).thenReturn(entCert);
-        }
-        catch (EntitlementRefusedException ere) {
-            // ...
-        }
+        when(oc.lookupByKey(eq("admin"))).thenReturn(owner);
+        when(cc.findByName(eq(owner), eq(Consumer.UEBER_CERT_CONSUMER))).thenReturn(null);
+        when(ucg.generate(owner.getKey(), eq(principal))).thenReturn(entCert);
 
         EntitlementCertificate result = resource.createUeberCertificate(principal, "admin");
 
@@ -1590,15 +1585,10 @@ public class OwnerResourceTest extends DatabaseTestFixture {
             ucg, null, null, null, null, null, null, null, productManager, contentManager
         );
 
-        try {
-            when(oc.lookupByKey(eq("admin"))).thenReturn(owner);
-            when(cc.findByName(eq(owner), eq(Consumer.UEBER_CERT_CONSUMER))).thenReturn(consumer);
-            when(ec.listByConsumer(eq(consumer))).thenReturn(entList);
-            when(ucg.generate(eq(owner), eq(principal))).thenReturn(entCert);
-        }
-        catch (EntitlementRefusedException ere) {
-            // ...
-        }
+        when(oc.lookupByKey(eq("admin"))).thenReturn(owner);
+        when(cc.findByName(eq(owner), eq(Consumer.UEBER_CERT_CONSUMER))).thenReturn(consumer);
+        when(ec.listByConsumer(eq(consumer))).thenReturn(entList);
+        when(ucg.generate(eq(owner.getKey()), eq(principal))).thenReturn(entCert);
 
         EntitlementCertificate result = resource.createUeberCertificate(principal, "admin");
 
