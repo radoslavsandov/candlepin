@@ -24,6 +24,7 @@ import org.candlepin.model.EntitlementCurator;
 import org.candlepin.model.OwnerProductCurator;
 import org.candlepin.model.Pool;
 import org.candlepin.model.PoolAttribute;
+import org.candlepin.model.PoolCurator;
 import org.candlepin.model.Product;
 import org.candlepin.model.ProductAttribute;
 import org.candlepin.model.ProductCurator;
@@ -38,6 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -60,16 +62,18 @@ public class PoolRules {
     private EntitlementCurator entCurator;
     private OwnerProductCurator ownerProductCurator;
     private ProductCurator productCurator;
+    private PoolCurator poolCurator;
 
     @Inject
     public PoolRules(PoolManager poolManager, Configuration config, EntitlementCurator entCurator,
-        OwnerProductCurator ownerProductCurator, ProductCurator productCurator) {
+        OwnerProductCurator ownerProductCurator, ProductCurator productCurator, PoolCurator poolCurator) {
 
         this.poolManager = poolManager;
         this.config = config;
         this.entCurator = entCurator;
         this.ownerProductCurator = ownerProductCurator;
         this.productCurator = productCurator;
+        this.poolCurator = poolCurator;
     }
 
     private long calculateQuantity(long quantity, Product product, String upstreamPoolId) {
@@ -464,7 +468,9 @@ public class PoolRules {
         // If there are any changes made, then mark all the entitlements as dirty
         // so that they get regenerated on next checkin.
         if (update.changed()) {
-            for (Entitlement ent : pool.getEntitlements()) {
+            // Since the pool has changed, persist the changes before updating its entitlements.
+            poolCurator.saveOrUpdateAll(Arrays.asList(pool), false, false);
+            for (Entitlement ent : entCurator.listByPool(pool)) {
                 ent.setDirty(true);
             }
         }

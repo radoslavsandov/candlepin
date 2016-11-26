@@ -467,7 +467,6 @@ public class OwnerInfoCuratorTest extends DatabaseTestFixture {
         Entitlement entitlement = createEntitlement(owner, consumer, pool1, cert);
         entitlement.setQuantity(1);
         entitlementCurator.create(entitlement);
-        pool1.getEntitlements().add(entitlement);
 
         OwnerInfo info = ownerInfoCurator.lookupByOwner(owner);
 
@@ -496,7 +495,6 @@ public class OwnerInfoCuratorTest extends DatabaseTestFixture {
         Entitlement entitlement = createEntitlement(owner, consumer, pool1, cert);
         entitlement.setQuantity(1);
         entitlementCurator.create(entitlement);
-        pool1.getEntitlements().add(entitlement);
 
         OwnerInfo info = ownerInfoCurator.lookupByOwner(owner);
 
@@ -524,7 +522,6 @@ public class OwnerInfoCuratorTest extends DatabaseTestFixture {
         Entitlement entitlement = createEntitlement(owner, consumer, pool1, cert);
         entitlement.setQuantity(1);
         entitlementCurator.create(entitlement);
-        pool1.getEntitlements().add(entitlement);
 
         OwnerInfo info = ownerInfoCurator.lookupByOwner(owner);
 
@@ -553,7 +550,6 @@ public class OwnerInfoCuratorTest extends DatabaseTestFixture {
         Entitlement entitlement = createEntitlement(owner, consumer, pool1, cert);
         entitlement.setQuantity(1);
         entitlementCurator.create(entitlement);
-        pool1.getEntitlements().add(entitlement);
 
         OwnerInfo info = ownerInfoCurator.lookupByOwner(owner);
 
@@ -583,9 +579,6 @@ public class OwnerInfoCuratorTest extends DatabaseTestFixture {
         Entitlement entitlement = createEntitlement(owner, consumer, pool1, cert);
         entitlement.setQuantity(1);
         entitlementCurator.create(entitlement);
-        pool1.getEntitlements().add(entitlement);
-
-
 
         OwnerInfo info = ownerInfoCurator.lookupByOwner(owner);
 

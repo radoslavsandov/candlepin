@@ -925,7 +925,6 @@ public class OwnerResourceTest extends DatabaseTestFixture {
         SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
         Entitlement e1 = createEntitlement(owner, consumer, pool, null);
         e1.setQuantity(quantity);
-        pool.getEntitlements().add(e1);
 
         this.entitlementCurator.create(e1);
         this.poolCurator.merge(e1.getPool());

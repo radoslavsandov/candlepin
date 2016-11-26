@@ -239,8 +239,9 @@ public class OwnerInfoCurator {
      * use family = null to get counts for all pools.
      */
     private int getProductFamilyCount(Owner owner, Date date, String family, boolean virt) {
-        String queryStr = "select sum(ent.quantity) from Pool p" +
-            "              join p.entitlements as ent " +
+        String queryStr = "select p.id from Pool p" +
+//        String queryStr = "select sum(ent.quantity) from Pool p" +
+//            "              join p.entitlements as ent " +
             "              where p.owner = :owner " +
             "              and p.startDate < :date and p.endDate > :date ";
 
@@ -276,7 +277,11 @@ public class OwnerInfoCurator {
                         "     )" +
                         ")";
         }
-        Query query = currentSession().createQuery(queryStr)
+
+//        String mainQuery = "select sum(ent.quantity) from Pool p join p.entitlements as ent " +
+        String mainQuery = "select sum(ent.quantity) from Entitlement ent join ent.pool as pool " +
+                "WHERE pool.id in (" + queryStr + ")";
+        Query query = currentSession().createQuery(mainQuery)
             .setEntity("owner", owner)
             .setParameter("date", date);
 

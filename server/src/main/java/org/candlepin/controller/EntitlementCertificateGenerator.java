@@ -352,7 +352,8 @@ public class EntitlementCertificateGenerator {
         );
 
         for (Pool pool : pools) {
-            this.regenerateCertificatesOf(pool.getEntitlements(), lazy);
+            // FIXME We can look up all of the ents for the pool at once.
+            this.regenerateCertificatesOf(entitlementCurator.listByPool(pool), lazy);
         }
     }
 
@@ -412,9 +413,7 @@ public class EntitlementCertificateGenerator {
             );
         }
 
-        for (Pool pool : pools) {
-            this.regenerateCertificatesOf(pool.getEntitlements(), lazy);
-        }
+        this.regenerateCertificatesOf(entitlementCurator.listByPools(pools), lazy);
     }
 
 }

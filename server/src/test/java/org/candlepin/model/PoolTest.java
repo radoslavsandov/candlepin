@@ -166,7 +166,7 @@ public class PoolTest extends DatabaseTestFixture {
 
         consumerPool = poolCurator.find(consumerPool.getId());
         assertFalse(consumerPool.entitlementsAvailable(1));
-        assertEquals(1, consumerPool.getEntitlements().size());
+        assertEquals(1, entitlementCurator.listByPool(consumerPool).size());
     }
 
     @Test
@@ -320,7 +320,7 @@ public class PoolTest extends DatabaseTestFixture {
         assertTrue(ent2.getQuantity() == 5);
         Pool pool2 = poolCurator.find(pool.getId());
         assertTrue(pool2.getConsumed() == 5);
-        assertTrue(pool2.getEntitlements().size() == 1);
+        assertTrue(entitlementCurator.listByPool(pool2).size() == 1);
     }
 
     @Test

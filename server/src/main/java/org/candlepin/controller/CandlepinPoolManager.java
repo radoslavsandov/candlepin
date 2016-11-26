@@ -1704,10 +1704,7 @@ public class CandlepinPoolManager implements PoolManager {
         poolCurator.lock(poolsToLock);
         log.info("Batch revoking {} entitlements ", entsToRevoke.size());
         entsToRevoke = new ArrayList<Entitlement>(entsToRevoke);
-
-        for (Pool pool : poolsToDelete) {
-            entsToRevoke.addAll(pool.getEntitlements());
-        }
+        entsToRevoke.addAll(entitlementCurator.listByPools(poolsToDelete));
 
         log.debug("Adjusting consumed quantities on pools");
         for (Entitlement ent : entsToRevoke) {
@@ -1717,7 +1714,6 @@ public class CandlepinPoolManager implements PoolManager {
             int entQuantity = ent.getQuantity() != null ? ent.getQuantity() : 0;
 
             pool.setConsumed(pool.getConsumed() - entQuantity);
-            pool.getEntitlements().remove(ent);
             Consumer consumer = ent.getConsumer();
             if (consumer.getType().isManifest()) {
                 pool.setExported(pool.getExported() - entQuantity);
@@ -1925,17 +1921,11 @@ public class CandlepinPoolManager implements PoolManager {
             log.debug("Delete pools: {}", getPoolIds(pools));
         }
 
-        List<Entitlement> entitlementsToRevoke = new LinkedList<Entitlement>();
-
-        for (Pool p : pools) {
-            if (log.isDebugEnabled()) {
-                log.debug("Deletion of pool {} will revoke the following entitlements: {}",
-                    p.getId(), getEntIds(p.getEntitlements()));
-            }
-            entitlementsToRevoke.addAll(p.getEntitlements());
-        }
-
         if (!pools.isEmpty()) {
+            List<Entitlement> entitlementsToRevoke = new LinkedList<Entitlement>();
+            entitlementsToRevoke.addAll(entitlementCurator.listByPools(pools));
+            // TODO: Log deleted pools and entitlements.
+
             revokeEntitlements(entitlementsToRevoke, alreadyDeletedPools);
             log.debug("Batch deleting pools after successful revocation");
             poolCurator.batchDelete(pools, alreadyDeletedPools);
@@ -2056,7 +2046,6 @@ public class CandlepinPoolManager implements PoolManager {
             for (Entry<String, PoolQuantity> entry : poolQuantities.entrySet()) {
                 Entitlement e = result.get(entry.getKey());
                 consumer.addEntitlement(e);
-                entry.getValue().getPool().getEntitlements().add(e);
             }
 
             return result;

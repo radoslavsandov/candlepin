@@ -253,7 +253,6 @@ public class EnforcerTest extends DatabaseTestFixture {
             Entitlement e = createEntitlement(theOwner, c, p, null);
             e.setQuantity(1);
             entitlementCurator.create(e);
-            p.getEntitlements().add(e);
             poolCurator.merge(p);
         }
         poolCurator.refresh(p);

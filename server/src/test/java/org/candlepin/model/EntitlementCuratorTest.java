@@ -70,53 +70,6 @@ public class EntitlementCuratorTest extends DatabaseTestFixture {
     private Product providedProduct2;
     private Product testProduct;
 
-    /**
-     * Reproducer of EXTRA Lazy problem. This test is here mainly to demonstrate
-     * the problem. The problem is that Pool.entitlements is an extra lazy
-     * collection and at the same time it is cascading CREATE.
-     * The most important lines in this method are:
-     *     (1) ent.getPool().getEntitlements().remove(ent);
-     *     (2) Hibernate.initialize(ent.getPool().getEntitlements());
-     * The problem is that remove() in (1) will not initialize the collection because
-     * it is EXTRA LAZY. Then (2) will initialize without removed entitlement
-     * Then when owning consumer c is being deleted, hibernate will recreate
-     * the entitlements from the initialized collection Pool.entitlements and
-     * subsequent delete of Consumer will cause foreign key exception.
-     */
-    @Test
-    public void removeConsumerWithEntitlements() {
-        beginTransaction();
-        Consumer c = createConsumer(owner);
-        consumerCurator.create(c);
-        Product product = TestUtil.createProduct();
-        productCurator.create(product);
-        Pool p = createPool(owner, product, 2L, dateSource.currentDate(), createDate(2020, 1, 1));
-        poolCurator.create(p);
-        EntitlementCertificate cert = createEntitlementCertificate("keyx", "certificatex");
-        Entitlement entitlement = createEntitlement(owner, c, p, cert);
-        entitlementCurator.create(entitlement);
-        commitTransaction();
-        entityManager().clear();
-
-        beginTransaction();
-        c = consumerCurator.find(c.getId());
-        for (Entitlement ent : c.getEntitlements()) {
-            ent.getPool().getEntitlements().remove(ent);
-            Hibernate.initialize(ent.getPool().getEntitlements());
-        }
-        try {
-            consumerCurator.delete(c);
-            consumerCurator.flush();
-        }
-        catch (Exception ex) {
-            assertEquals(ex.getCause().getCause().getClass(),
-                SQLIntegrityConstraintViolationException.class);
-        }
-        finally {
-            rollbackTransaction();
-        }
-    }
-
     @Before
     public void setUp() {
         modifyOwner = createOwner();

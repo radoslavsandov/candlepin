@@ -27,8 +27,6 @@ import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Cascade;
 import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.GenericGenerator;
-import org.hibernate.annotations.LazyCollection;
-import org.hibernate.annotations.LazyCollectionOption;
 
 import java.util.Collection;
 import java.util.Date;
@@ -303,10 +301,6 @@ public class Pool extends AbstractHibernateObject implements Persisted, Owned, N
         org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
     @BatchSize(size = 1000)
     private Set<PoolAttribute> attributes = new HashSet<PoolAttribute>();
-
-    @OneToMany(mappedBy = "pool", cascade = CascadeType.ALL)
-    @LazyCollection(LazyCollectionOption.EXTRA)
-    private Set<Entitlement> entitlements = new HashSet<Entitlement>();
 
     @Size(max = 255)
     private String restrictedToUsername;
@@ -875,25 +869,6 @@ public class Pool extends AbstractHibernateObject implements Persisted, Owned, N
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public void setProduct(Product product) {
         this.product = product;
-    }
-
-    /**
-     * Gets the entitlements for this instance.
-     *
-     * @return The entitlements.
-     */
-    @XmlTransient
-    public Set<Entitlement> getEntitlements() {
-        return this.entitlements;
-    }
-
-    /**
-     * Sets the entitlements for this instance.
-     *
-     * @param entitlements The entitlements.
-     */
-    public void setEntitlements(Set<Entitlement> entitlements) {
-        this.entitlements = entitlements;
     }
 
     public String getRestrictedToUsername() {

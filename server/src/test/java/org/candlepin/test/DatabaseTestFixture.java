@@ -390,7 +390,6 @@ public class DatabaseTestFixture {
 
         // Maintain runtime consistency
         consumer.addEntitlement(entitlement);
-        pool.getEntitlements().add(entitlement);
 
         if (cert != null) {
             cert.setEntitlement(entitlement);

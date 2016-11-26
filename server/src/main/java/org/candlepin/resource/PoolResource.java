@@ -30,6 +30,7 @@ import org.candlepin.model.Cdn;
 import org.candlepin.model.Consumer;
 import org.candlepin.model.ConsumerCurator;
 import org.candlepin.model.Entitlement;
+import org.candlepin.model.EntitlementCurator;
 import org.candlepin.model.Owner;
 import org.candlepin.model.OwnerCurator;
 import org.candlepin.model.Pool;
@@ -75,14 +76,17 @@ public class PoolResource {
     private OwnerCurator ownerCurator;
     private I18n i18n;
     private PoolManager poolManager;
+    private EntitlementCurator entitlementCurator;
     private CalculatedAttributesUtil calculatedAttributesUtil;
 
     @Inject
     public PoolResource(ConsumerCurator consumerCurator, OwnerCurator ownerCurator,
-        I18n i18n, PoolManager poolManager, CalculatedAttributesUtil calculatedAttributesUtil) {
+        I18n i18n, PoolManager poolManager, EntitlementCurator entitlementCurator,
+        CalculatedAttributesUtil calculatedAttributesUtil) {
 
         this.consumerCurator = consumerCurator;
         this.ownerCurator = ownerCurator;
+        this.entitlementCurator = entitlementCurator;
         this.i18n = i18n;
         this.poolManager = poolManager;
         this.calculatedAttributesUtil = calculatedAttributesUtil;
@@ -276,8 +280,7 @@ public class PoolResource {
                 "Subscription Pool with ID ''{0}'' could not be found.", id));
         }
 
-        List<Entitlement> entitlements = new ArrayList<Entitlement>();
-        entitlements.addAll(pool.getEntitlements());
+        List<Entitlement> entitlements = entitlementCurator.listByPool(pool);
         return entitlements;
     }
 

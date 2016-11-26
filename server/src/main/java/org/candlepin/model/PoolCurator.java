@@ -28,7 +28,6 @@ import com.google.inject.persist.Transactional;
 import org.hibernate.Criteria;
 import org.hibernate.FetchMode;
 import org.hibernate.Filter;
-import org.hibernate.Hibernate;
 import org.hibernate.LockOptions;
 import org.hibernate.Query;
 import org.hibernate.ReplicationMode;
@@ -69,13 +68,16 @@ public class PoolCurator extends AbstractHibernateCurator<Pool> {
 
     private static Logger log = LoggerFactory.getLogger(PoolCurator.class);
     private CriteriaRules poolCriteria;
+    private EntitlementCurator entitlementCurator;
+
     @Inject
     protected Injector injector;
 
     @Inject
-    public PoolCurator(CriteriaRules poolCriteria) {
+    public PoolCurator(CriteriaRules poolCriteria, EntitlementCurator entitlementCurator) {
         super(Pool.class);
         this.poolCriteria = poolCriteria;
+        this.entitlementCurator = entitlementCurator;
     }
 
     @Override
@@ -169,13 +171,7 @@ public class PoolCurator extends AbstractHibernateCurator<Pool> {
     }
 
     private List<Entitlement> convertPoolsToEntitlements(List<Pool> pools) {
-        List<Entitlement> result = new ArrayList<Entitlement>();
-
-        for (Pool p : pools) {
-            result.addAll(p.getEntitlements());
-        }
-
-        return result;
+        return entitlementCurator.listByPools(pools);
     }
 
     /**
@@ -232,11 +228,10 @@ public class PoolCurator extends AbstractHibernateCurator<Pool> {
     public List<Pool> listExpiredPools(int blockSize) {
         Date now = new Date();
 
-        DetachedCriteria entCheck = DetachedCriteria.forClass(Pool.class, "entPool")
-            .createAlias("entitlements", "ent", JoinType.INNER_JOIN)
-            .add(Restrictions.eqProperty("entPool.id", "tgtPool.id"))
+        DetachedCriteria entCheck = DetachedCriteria.forClass(Entitlement.class, "ent")
+            .createAlias("ent.pool", "pool")
             .add(Restrictions.ge("ent.endDateOverride", now))
-            .setProjection(Projections.property("entPool.id"));
+            .setProjection(Projections.property("pool.id"));
 
         Criteria criteria = this.createSecureCriteria("tgtPool")
             .add(Restrictions.lt("tgtPool.endDate", now))
@@ -654,14 +649,14 @@ public class PoolCurator extends AbstractHibernateCurator<Pool> {
      * @return Set of levels based on exempt flag.
      */
     public Set<String> retrieveServiceLevelsForOwner(Owner owner, boolean exempt) {
+        String subSelect = "SELECT ent.pool.id FROM Entitlement ent where ent.pool = pool and ent.endDateOverride >= current_date()";
         String stmt = "SELECT DISTINCT attribute.name, attribute.value, product.id " +
             "FROM Pool AS pool " +
             "  INNER JOIN pool.product AS product " +
             "  INNER JOIN product.attributes AS attribute " +
-            "  LEFT JOIN pool.entitlements AS entitlement " +
             "WHERE pool.owner.id = :owner_id " +
             "  AND (attribute.name = 'support_level' OR attribute.name = 'support_level_exempt') " +
-            "  AND (pool.endDate >= current_date() OR entitlement.endDateOverride >= current_date()) " +
+            "  AND (pool.endDate >= current_date() OR pool.id in (" + subSelect + ")) " +
             // Needs to be ordered, because the code below assumes exempt levels are first
             "ORDER BY attribute.name DESC";
 
@@ -752,17 +747,6 @@ public class PoolCurator extends AbstractHibernateCurator<Pool> {
             }
             alreadyDeletedPools.add(pool.getId());
             this.currentSession().delete(pool);
-
-            // Maintain runtime consistency. The entitlements for the pool have been deleted on the
-            // database because delete is cascaded on Pool.entitlements relation
-
-            // While it'd be nice to be able to skip this for every pool, we have no guarantee that
-            // the pools came fresh from the DB with uninitialized entitlement collections. Since
-            // it could be initialized, we should clear it so other bits using the pool don't
-            // attempt to use the entitlements.
-            if (Hibernate.isInitialized(pool.getEntitlements())) {
-                pool.getEntitlements().clear();
-            }
         }
     }
 

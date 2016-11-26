@@ -104,6 +104,20 @@ public class PoolCuratorTest extends DatabaseTestFixture {
     }
 
     @Test
+    public void testListExpiredPools() {
+        Pool pool = createPool(owner, product, 100L,
+            TestUtil.createDate(2000, 3, 2), TestUtil.createDate(2005, 3, 2));
+        poolCurator.create(pool);
+        assertEquals(1, poolCurator.listExpiredPools().size());
+
+        // Extend the end date with an entitlement.
+        Entitlement ent = createEntitlement(owner, consumer, pool, createEntitlementCertificate("A", "B"));
+        ent.setEndDateOverride(TestUtil.createDate(2018, 3, 2));
+        entitlementCurator.save(ent);
+        assertTrue(poolCurator.listExpiredPools().isEmpty());
+    }
+
+    @Test
     public void testAvailablePoolsDoesNotIncludeUeberPool() throws Exception {
         Pool pool = createPool(owner, product, 100L,
             TestUtil.createDate(2000, 3, 2), TestUtil.createDate(2005, 3, 2));

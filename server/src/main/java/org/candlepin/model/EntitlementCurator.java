@@ -410,7 +410,6 @@ public class EntitlementCurator extends AbstractHibernateCurator<Entitlement> {
             // Maintain runtime consistency.
             entity.getCertificates().clear();
             entity.getConsumer().getEntitlements().remove(entity);
-            entity.getPool().getEntitlements().remove(entity);
         }
     }
 
@@ -432,10 +431,6 @@ public class EntitlementCurator extends AbstractHibernateCurator<Entitlement> {
 
             if (Hibernate.isInitialized(entitlement.getConsumer().getEntitlements())) {
                 entitlement.getConsumer().getEntitlements().remove(entitlement);
-            }
-
-            if (Hibernate.isInitialized(entitlement.getPool().getEntitlements())) {
-                entitlement.getPool().getEntitlements().remove(entitlement);
             }
         }
     }
@@ -592,5 +587,32 @@ public class EntitlementCurator extends AbstractHibernateCurator<Entitlement> {
         }
 
         return count;
+    }
+
+    /**
+     * Find the entitlements for the given pool.
+     *
+     * @param pool
+     * @return
+     */
+    public List<Entitlement> listByPool(Pool pool) {
+        return getEntityManager()
+            .createQuery("select e from Entitlement e where e.pool=:pool")
+            .setParameter("pool", pool)
+            .getResultList();
+    }
+
+    public List<Entitlement> listByPools(List<Pool> pools) {
+        Query query = getEntityManager().createQuery("select e from Entitlement e where e.pool IN (:pools)");
+
+        Iterable<List<Pool>> blocks = Iterables.partition(
+            pools, AbstractHibernateCurator.IN_OPERATOR_BLOCK_SIZE
+        );
+
+        List<Entitlement> ents = new LinkedList<Entitlement>();
+        for (List<Pool> block : blocks) {
+            ents.addAll(query.setParameter("pools", block).getResultList());
+        }
+        return ents;
     }
 }

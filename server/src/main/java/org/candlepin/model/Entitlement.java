@@ -30,6 +30,7 @@ import java.util.Set;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
@@ -92,7 +93,7 @@ public class Entitlement extends AbstractHibernateObject
     @NotNull
     private Consumer consumer;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @ForeignKey(name = "fk_entitlement_pool")
     @JoinColumn(nullable = true)
     @Index(name = "cp_entitlement_pool_fk_idx")
