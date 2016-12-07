@@ -1709,19 +1709,37 @@ public class CandlepinPoolManager implements PoolManager {
             entsToRevoke.addAll(pool.getEntitlements());
         }
 
+        // Because Pool.entitlements is ExtraLazy, a flush is automatically issued
+        // by hibernate for a pool, every time an Entitlement is removed from the
+        // collection. Capture all ents to be deleted for the target pools so
+        // that we can minimize flushing occurrences.
+        Map<Pool, Set<Entitlement>> entMappings = new HashMap<Pool, Set<Entitlement>>();
         log.debug("Adjusting consumed quantities on pools");
         for (Entitlement ent : entsToRevoke) {
             //We need to trigger lazy load of provided products
             //to have access to those products later in this method.
             Pool pool = ent.getPool();
-            int entQuantity = ent.getQuantity() != null ? ent.getQuantity() : 0;
 
+            if (!entMappings.containsKey(pool)) {
+                HashSet<Entitlement> entsForPool = new HashSet<Entitlement>();
+                entsForPool.add(ent);
+                entMappings.put(pool, entsForPool);
+            }
+            else {
+                entMappings.get(pool).add(ent);
+            }
+
+            int entQuantity = ent.getQuantity() != null ? ent.getQuantity() : 0;
             pool.setConsumed(pool.getConsumed() - entQuantity);
-            pool.getEntitlements().remove(ent);
             Consumer consumer = ent.getConsumer();
             if (consumer.getType().isManifest()) {
                 pool.setExported(pool.getExported() - entQuantity);
             }
+        }
+
+        // Remove ents from the appropriate pools.
+        for (Entry<Pool, Set<Entitlement>> next : entMappings.entrySet()) {
+            next.getKey().getEntitlements().removeAll(next.getValue());
         }
 
         /**
