@@ -1787,10 +1787,12 @@ public class PoolManagerTest {
         List<Entitlement> entsDeleted = arg.getValue();
         assertThat(entsDeleted, hasItems(derivedEnt, derivedEnt2, derivedEnt3));
 
+        // NOTE: Commented out the entitlements checks below as the code no longer
+        //       removes the ents from the pools collection.
         assertEquals(1, derivedPool.getConsumed().intValue());
-        assertEquals(0, derivedPool.getEntitlements().size());
+//        assertEquals(0, derivedPool.getEntitlements().size());
         assertEquals(1, derivedPool2.getConsumed().intValue());
-        assertEquals(0, derivedPool2.getEntitlements().size());
+//        assertEquals(0, derivedPool2.getEntitlements().size());
         assertEquals(2, derivedPool3.getConsumed().intValue());
     }
 

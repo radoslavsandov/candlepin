@@ -1737,10 +1737,10 @@ public class CandlepinPoolManager implements PoolManager {
             }
         }
 
-        // Remove ents from the appropriate pools.
-        for (Entry<Pool, Set<Entitlement>> next : entMappings.entrySet()) {
-            next.getKey().getEntitlements().removeAll(next.getValue());
-        }
+//        // Remove ents from the appropriate pools.
+//        for (Entry<Pool, Set<Entitlement>> next : entMappings.entrySet()) {
+//            next.getKey().getEntitlements().removeAll(next.getValue());
+//        }
 
         /**
          * Before deleting the entitlements, we need to find out if there are any
