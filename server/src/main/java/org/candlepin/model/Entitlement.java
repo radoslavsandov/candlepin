@@ -93,7 +93,7 @@ public class Entitlement extends AbstractHibernateObject
     @NotNull
     private Consumer consumer;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @ForeignKey(name = "fk_entitlement_pool")
     @JoinColumn(nullable = true)
     @Index(name = "cp_entitlement_pool_fk_idx")
