@@ -45,13 +45,11 @@ import org.candlepin.exceptions.NotFoundException;
 import org.candlepin.model.CertificateSerial;
 import org.candlepin.model.CertificateSerialDto;
 import org.candlepin.model.Consumer;
+import org.candlepin.model.ConsumerContentOverrideCurator;
 import org.candlepin.model.ConsumerCurator;
 import org.candlepin.model.ConsumerInstalledProduct;
 import org.candlepin.model.ConsumerType;
 import org.candlepin.model.ConsumerType.ConsumerTypeEnum;
-import org.candlepin.model.activationkeys.ActivationKey;
-import org.candlepin.model.activationkeys.ActivationKeyCurator;
-import org.candlepin.model.ConsumerContentOverrideCurator;
 import org.candlepin.model.ConsumerTypeCurator;
 import org.candlepin.model.Entitlement;
 import org.candlepin.model.EntitlementCertificate;
@@ -62,6 +60,8 @@ import org.candlepin.model.OwnerCurator;
 import org.candlepin.model.Pool;
 import org.candlepin.model.Product;
 import org.candlepin.model.Subscription;
+import org.candlepin.model.activationkeys.ActivationKey;
+import org.candlepin.model.activationkeys.ActivationKeyCurator;
 import org.candlepin.policy.js.activationkey.ActivationKeyRules;
 import org.candlepin.policy.js.compliance.ComplianceRules;
 import org.candlepin.policy.js.compliance.ComplianceStatus;
@@ -74,6 +74,7 @@ import org.candlepin.service.UserServiceAdapter;
 import org.candlepin.test.TestUtil;
 import org.candlepin.util.ServiceLevelValidator;
 
+import org.apache.commons.lang.RandomStringUtils;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -529,16 +530,14 @@ public class ConsumerResourceTest {
     @Test
     public void testCreateConsumerShouldFailOnMaxLengthOfName() {
         thrown.expect(BadRequestException.class);
-        int max = Consumer.MAX_LENGTH_OF_CONSUMER_NAME;
         String m = String.format("Name of the consumer " +
-            "should be shorter than %d characters.", max);
+            "should be shorter than %d characters.", (Consumer.MAX_LENGTH_OF_CONSUMER_NAME + 1));
         thrown.expectMessage(m);
 
         Consumer c = mock(Consumer.class);
         Owner o = mock(Owner.class);
         UserPrincipal up = mock(UserPrincipal.class);
         OwnerCurator oc = mock(OwnerCurator.class);
-        ConsumerTypeCurator ctc = mock(ConsumerTypeCurator.class);
         ConsumerType cType = new ConsumerType(ConsumerTypeEnum.SYSTEM);
         ConsumerResource consumerResource = new ConsumerResource(
             null, null, null, null, null, null,
@@ -548,27 +547,14 @@ public class ConsumerResourceTest {
             null, null, null);
 
         String ownerKey = "testOwner";
-        when(o.getKey()).thenReturn(ownerKey);
         when(oc.lookupByKey(eq(ownerKey))).thenReturn(o);
+        when(o.getKey()).thenReturn(ownerKey);
         when(c.getType()).thenReturn(cType);
-        when(c.getName()).thenReturn(generateNameLongerThan255());
-        when(ctc.lookupByLabel(eq("system"))).thenReturn(cType);
-        when(up.canAccess(eq(o), eq(SubResource.CONSUMERS), eq(Access.CREATE))).
-            thenReturn(true);
+        String s = RandomStringUtils.randomAlphanumeric(Consumer.MAX_LENGTH_OF_CONSUMER_NAME + 1);
+        when(c.getName()).thenReturn(s);
+        when(up.canAccess(eq(o), eq(SubResource.CONSUMERS), eq(Access.CREATE))).thenReturn(true);
 
         consumerResource.create(c, up, null, ownerKey, null);
-    }
-
-    private String generateNameLongerThan255() {
-        String name255 =
-            "qwert12345qwert12345qwert12345qwert12345qwert12345" +
-            "qwert12345qwert12345qwert12345qwert12345qwert12345" +
-            "qwert12345qwert12345qwert12345qwert12345qwert12345" +
-            "qwert12345qwert12345qwert12345qwert12345qwert12345" +
-            "qwert12345qwert12345qwert12345qwert12345qwert12345" +
-            "qwert";
-        name255 += TestUtil.randomInt();
-        return name255;
     }
 
     @Test
