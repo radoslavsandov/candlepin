@@ -92,16 +92,18 @@ public class HypervisorUpdateJob extends KingpinJob {
         this.i18n = i18n;
     }
 
-    public static JobStatus scheduleJob(JobCurator jobCurator,
-        Scheduler scheduler, JobDetail detail,
+    public static JobStatus scheduleJob(JobCurator jobCurator, Scheduler scheduler, JobDetail detail,
         Trigger trigger) throws SchedulerException {
+
         JobStatus result = jobCurator.getByClassAndTarget(
             detail.getJobDataMap().getString(JobStatus.TARGET_ID),
             HypervisorUpdateJob.class);
+
         if (result == null) {
             return KingpinJob.scheduleJob(jobCurator, scheduler, detail, trigger);
         }
-        log.debug("Scheduling job without a trigger: " + detail.getKey().getName());
+
+        log.debug("Scheduling job without a trigger: {}", detail.getKey().getName());
         JobStatus status = KingpinJob.scheduleJob(jobCurator, scheduler, detail, null);
         return status;
     }
@@ -109,6 +111,7 @@ public class HypervisorUpdateJob extends KingpinJob {
     public static boolean isSchedulable(JobCurator jobCurator, JobStatus status) {
         long running = jobCurator.findNumRunningByClassAndTarget(
             status.getTargetId(), HypervisorUpdateJob.class);
+
         return running == 0;  // We can start the job if there are 0 like it running
     }
 
@@ -116,11 +119,11 @@ public class HypervisorUpdateJob extends KingpinJob {
         Set<String> guests, Map<String, Consumer> incomingHosts) {
         int emptyGuestIdCount = 0;
         int emptyHypervisorIdCount = 0;
+        int invalidHypervisorIdCount = 0;
 
         List<Consumer> l = hypervisorList.getHypervisors();
         for (Iterator<Consumer> hypervisors = l.iterator(); hypervisors.hasNext();) {
             Consumer hypervisor = hypervisors.next();
-
             HypervisorId idWrapper = hypervisor.getHypervisorId();
 
             if (idWrapper == null) {
@@ -133,9 +136,19 @@ public class HypervisorUpdateJob extends KingpinJob {
                 continue;
             }
 
-            if ("".equals(id)) {
+            if (id.isEmpty()) {
                 hypervisors.remove();
                 emptyHypervisorIdCount++;
+                continue;
+            }
+
+            // Trim & remove trailing period(s)
+            id = id.trim().replaceFirst("\\.+$", "");
+
+            if (id.isEmpty()) {
+                // Only way it will be empty here is if it only contained characters we removed
+                hypervisors.remove();
+                invalidHypervisorIdCount++;
                 continue;
             }
 
@@ -162,6 +175,10 @@ public class HypervisorUpdateJob extends KingpinJob {
 
         if (emptyHypervisorIdCount > 0) {
             log.debug("Ignoring {} hypervisors with empty hypervisor IDs", emptyHypervisorIdCount);
+        }
+
+        if (invalidHypervisorIdCount > 0) {
+            log.debug("Ignoring {} hypervisors with malformed hypervisor IDs", invalidHypervisorIdCount);
         }
 
         if (emptyGuestIdCount > 0) {
@@ -229,8 +246,8 @@ public class HypervisorUpdateJob extends KingpinJob {
                 Consumer reportedOnConsumer = null;
                 if (knownHost == null) {
                     if (!create) {
-                        result.failed(hypervisorId, "Unable to find hypervisor with id " +
-                            hypervisorId + " in org " + ownerKey);
+                        result.failed(hypervisorId, "Unable to find hypervisor with id " + hypervisorId +
+                            " in org " + ownerKey);
                     }
                     else {
                         log.debug("Registering new host consumer for hypervisor ID: {}", hypervisorId);
@@ -252,6 +269,7 @@ public class HypervisorUpdateJob extends KingpinJob {
                             hypervisorId, ownerKey, knownHost.getHypervisorId().getReporterId(),
                             jobReporterId);
                     }
+
                     if (consumerResource.performConsumerUpdates(incoming, knownHost, guestConsumersMap,
                         false)) {
                         consumerCurator.update(knownHost);
@@ -266,6 +284,7 @@ public class HypervisorUpdateJob extends KingpinJob {
                     reportedOnConsumer.getHypervisorId() != null &&
                     (reportedOnConsumer.getHypervisorId().getReporterId() == null ||
                     !jobReporterId.contentEquals(reportedOnConsumer.getHypervisorId().getReporterId()))) {
+
                     reportedOnConsumer.getHypervisorId().setReporterId(jobReporterId);
                 }
                 else if (jobReporterId == null) {
@@ -291,6 +310,7 @@ public class HypervisorUpdateJob extends KingpinJob {
      */
     public static JobDetail forOwner(Owner owner, String data, Boolean create, Principal principal,
         String reporterId) {
+
         JobDataMap map = new JobDataMap();
         map.put(JobStatus.TARGET_TYPE, JobStatus.TargetType.OWNER);
         map.put(JobStatus.TARGET_ID, owner.getKey());
@@ -298,6 +318,7 @@ public class HypervisorUpdateJob extends KingpinJob {
         map.put(CREATE, create);
         map.put(DATA, compress(data));
         map.put(PRINCIPAL, principal);
+
         if (reporterId != null) {
             map.put(REPORTER_ID, reporterId);
         }
@@ -354,9 +375,11 @@ public class HypervisorUpdateJob extends KingpinJob {
         consumer.setFact("uname.machine", "x86_64");
         consumer.setGuestIds(new ArrayList<GuestId>());
         consumer.setOwner(owner);
+
         // Create HypervisorId
         HypervisorId hypervisorId = new HypervisorId(consumer, incHypervisorId);
         consumer.setHypervisorId(hypervisorId);
+
         return consumer;
     }
 
@@ -375,6 +398,7 @@ public class HypervisorUpdateJob extends KingpinJob {
         public List<Consumer> getHypervisors() {
             return this.hypervisors;
         }
+
         public void setConsumers(List<Consumer> hypervisors) {
             this.hypervisors = hypervisors;
         }
@@ -384,6 +408,7 @@ public class HypervisorUpdateJob extends KingpinJob {
         Date now = new Date();
         consumerCurator.updateLastCheckin(consumer, now);
         consumer.setLastCheckin(now);
+
         return consumer;
     }
 }

@@ -133,6 +133,7 @@ public class HypervisorId extends AbstractHibernateObject {
         if (hypervisorId != null) {
             hypervisorId = hypervisorId.toLowerCase();
         }
+
         this.hypervisorId = hypervisorId;
     }
 

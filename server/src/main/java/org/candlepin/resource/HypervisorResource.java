@@ -116,7 +116,8 @@ public class HypervisorResource {
             "Default is true.  If false is specified, hypervisorIds that are not found" +
             "will result in failed entries in the resulting HypervisorCheckInResult")
         @QueryParam("create_missing") @DefaultValue("true") boolean createMissing) {
-        log.debug("Hypervisor check-in by principal: " + principal);
+
+        log.debug("Hypervisor check-in by principal: {}", principal);
 
         if (hostGuestMap == null) {
             log.debug("Host/Guest mapping provided during hypervisor checkin was null.");
@@ -133,7 +134,7 @@ public class HypervisorResource {
                     owner.getKey()));
         }
 
-        if (hostGuestMap.remove("") != null) {
+        if (hostGuestMap.remove("") != null || hostGuestMap.remove(null) != null) {
             log.warn("Ignoring empty hypervisor id");
         }
 
@@ -169,20 +170,22 @@ public class HypervisorResource {
         }
 
         // Maps virt guest ID to registered consumer for guest, if one exists:
-        VirtConsumerMap guestConsumersMap = consumerCurator.getGuestConsumersMap(
-            owner, allGuestIds);
+        VirtConsumerMap guestConsumersMap = consumerCurator.getGuestConsumersMap(owner, allGuestIds);
 
         HypervisorCheckInResult result = new HypervisorCheckInResult();
         for (Entry<String, List<GuestId>> hostEntry : hostGuestMap.entrySet()) {
-            String hypervisorId = hostEntry.getKey();
+
+            // Silently clean up hypervisor IDs
+            String hypervisorId = this.sanitizeHypervisorId(hostEntry.getKey());
+
             // Treat null guest list as an empty list.
-            // We can get an empty list here from katello due to an update
-            // to ruby on rails.
+            // We can get an empty list here from katello due to an update to ruby on rails.
             // (https://github.com/rails/rails/issues/13766#issuecomment-32730270)
-            // See bzs 1332637, 1332635
+            // BZs: 1332637, 1332635
             if (hostEntry.getValue() == null) {
                 hostEntry.setValue(new ArrayList<GuestId>());
             }
+
             try {
                 log.debug("Syncing virt host: {} ({} guest IDs)", hypervisorId, hostEntry.getValue().size());
 
@@ -196,6 +199,7 @@ public class HypervisorResource {
                             "Unable to find hypervisor in org ''{0}''", ownerKey));
                         continue;
                     }
+
                     log.debug("Registering new host consumer for hypervisor ID: {}", hypervisorId);
                     consumer = createConsumerForHypervisorId(hypervisorId, owner, principal);
                     hostConsumerCreated = true;
@@ -203,11 +207,13 @@ public class HypervisorResource {
                 else {
                     consumer = hypervisorConsumersMap.get(hypervisorId);
                 }
-                boolean guestIdsUpdated = addGuestIds(consumer, hostEntry.getValue(), guestConsumersMap);
 
+                boolean guestIdsUpdated = addGuestIds(consumer, hostEntry.getValue(), guestConsumersMap);
                 Date now = new Date();
+
                 consumerCurator.updateLastCheckin(consumer, now);
                 consumer.setLastCheckin(now);
+
                 // Populate the result with the processed consumer.
                 if (hostConsumerCreated) {
                     result.created(consumer);
@@ -224,6 +230,7 @@ public class HypervisorResource {
                 result.failed(hypervisorId, e.getMessage());
             }
         }
+
         log.info("Summary of hypervisor checkin by principal \"{}\": {}", principal, result);
         return result;
     }
@@ -256,12 +263,12 @@ public class HypervisorResource {
         @QueryParam("reporter_id") String reporterId) {
 
         if (hypervisorJson == null || hypervisorJson.isEmpty()) {
-            log.debug("Host/Guest mapping provided during hypervisor update was null.");
+            log.debug("Host/Guest mapping provided during hypervisor update was null or empty.");
             throw new BadRequestException(
                 i18n.tr("Host to guest mapping was not provided for hypervisor update."));
         }
 
-        log.info("Hypervisor update by principal: " + principal);
+        log.info("Hypervisor update by principal: {}", principal);
         Owner owner = this.getOwner(ownerKey);
 
         return HypervisorUpdateJob.forOwner(owner, hypervisorJson, createMissing, principal, reporterId);
@@ -273,9 +280,9 @@ public class HypervisorResource {
     private Owner getOwner(String ownerKey) {
         Owner owner = ownerCurator.lookupByKey(ownerKey);
         if (owner == null) {
-            throw new NotFoundException(i18n.tr(
-                "owner with key: {0} was not found.", ownerKey));
+            throw new NotFoundException(i18n.tr("owner with key: {0} was not found.", ownerKey));
         }
+
         return owner;
     }
 
@@ -283,34 +290,65 @@ public class HypervisorResource {
      * Add a list of guestIds to the given consumer,
      * return whether or not there was any change
      */
-    private boolean addGuestIds(Consumer consumer, List<GuestId> guestIds,
-        VirtConsumerMap guestConsumerMap) {
+    private boolean addGuestIds(Consumer consumer, List<GuestId> guestIds, VirtConsumerMap guestConsumerMap) {
         Consumer withIds = new Consumer();
         withIds.setGuestIds(guestIds);
-        boolean guestIdsUpdated =
-            consumerResource.performConsumerUpdates(withIds, consumer, guestConsumerMap);
+
+        boolean guestIdsUpdated = this.consumerResource.performConsumerUpdates(withIds, consumer,
+            guestConsumerMap);
+
         if (guestIdsUpdated) {
             consumerCurator.update(consumer);
         }
+
         return guestIdsUpdated;
     }
 
     /*
      * Create a new hypervisor type consumer to represent the incoming hypervisorId
      */
-    private Consumer createConsumerForHypervisorId(String incHypervisorId,
-        Owner owner, Principal principal) {
+    private Consumer createConsumerForHypervisorId(String incHypervisorId, Owner owner, Principal principal) {
         Consumer consumer = new Consumer();
         consumer.setName(incHypervisorId);
         consumer.setType(new ConsumerType(ConsumerTypeEnum.HYPERVISOR));
         consumer.setFact("uname.machine", "x86_64");
         consumer.setGuestIds(new ArrayList<GuestId>());
         consumer.setOwner(owner);
+
         // Create HypervisorId
         HypervisorId hypervisorId = new HypervisorId(consumer, incHypervisorId);
         consumer.setHypervisorId(hypervisorId);
+
         // Create Consumer
         return consumerResource.create(consumer, principal, null, owner.getKey(), null, false);
+    }
+
+    /**
+     * Sanitizes the given hypervisor ID, silently cleaning up reconcilable errors and throwing an
+     * exception for data that cannot be corrected.
+     *
+     * @param hypervisorId
+     *  The hypervisor ID to sanitize
+     *
+     * @return
+     *  a sanitized hypervisor ID
+     */
+    private String sanitizeHypervisorId(String hypervisorId) {
+        if (hypervisorId == null || hypervisorId.isEmpty()) {
+            throw new BadRequestException(i18n.tr("Hypervisor ID is null or empty"));
+        }
+
+        // Trim & remove trailing period(s)
+        String output = hypervisorId.trim().replaceFirst("\\.+$", "");
+
+        // If we've removed everything and ended with an empty string, that's bad...
+        if (output == null || output.isEmpty()) {
+            throw new BadRequestException(i18n.tr(
+                "Hypervisor ID contains only ignored or invalid characters: {0}", hypervisorId
+            ));
+        }
+
+        return output;
     }
 
 }

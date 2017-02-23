@@ -561,8 +561,7 @@ public class ConsumerResource {
         }
         catch (Exception e) {
             log.error("Problem creating unit:", e);
-            throw new BadRequestException(i18n.tr(
-                "Problem creating unit {0}", consumer));
+            throw new BadRequestException(i18n.tr("Problem creating unit {0}", consumer));
         }
     }
 
@@ -1019,6 +1018,7 @@ public class ConsumerResource {
             toUpdate.setContentAccessMode(updated.getContentAccessMode());
             changesMade = true;
         }
+
         if (!StringUtils.isEmpty(updated.getContentAccessMode()) && !toUpdate.getType().isManifest()) {
             throw new BadRequestException(i18n.tr("The consumer cannot be assigned a content access mode."));
         }
