@@ -27,6 +27,7 @@ import org.candlepin.model.ProductContent;
 import org.candlepin.model.dto.Content;
 import org.candlepin.model.dto.EntitlementBody;
 import org.candlepin.model.dto.Order;
+import org.candlepin.model.dto.PoolId;
 import org.candlepin.model.dto.Service;
 import org.candlepin.model.dto.TinySubscription;
 import org.candlepin.pki.X509ByteExtensionWrapper;
@@ -284,9 +285,10 @@ public class X509V3ExtensionUtil extends X509Util {
         return toReturn;
     }
 
-    public org.candlepin.model.dto.Pool createPool(Entitlement ent) {
-        org.candlepin.model.dto.Pool toReturn = new org.candlepin.model.dto.Pool();
+    public PoolId createPool(Entitlement ent) {
+        PoolId toReturn = new PoolId();
         toReturn.setId(ent.getPool().getId());
+
         return toReturn;
     }
 

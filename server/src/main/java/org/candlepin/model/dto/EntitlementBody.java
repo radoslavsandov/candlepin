@@ -32,7 +32,7 @@ public class EntitlementBody {
     private TinySubscription subscription;
     private Order order;
     private List<Product> products;
-    private Pool pool;
+    private PoolId pool;
 
     /**
      * @param uuid
@@ -76,7 +76,7 @@ public class EntitlementBody {
     /**
      * @param pool the pool to set
      */
-    public void setPool(Pool pool) {
+    public void setPool(PoolId pool) {
         this.pool = pool;
     }
 }
