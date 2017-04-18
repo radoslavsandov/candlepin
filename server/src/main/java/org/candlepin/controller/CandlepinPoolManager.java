@@ -1654,9 +1654,7 @@ public class CandlepinPoolManager implements PoolManager {
         // shares don't need entitlement certificate since they don't talk to the CDN
         if (!consumer.isShare()) {
             handler.handleSelfCertificates(consumer, poolQuantities, entitlements);
-            this.ecGenerator.regenerateCertificatesByEntitlementIds(
-                this.entitlementCurator.batchListModifying(entitlements.values()), true
-            );
+            this.entitlementCurator.markModifyingEntsDirty(entitlements.values());
         }
 
         // we might have changed the bonus pool quantities, lets find out.
@@ -1838,11 +1836,9 @@ public class CandlepinPoolManager implements PoolManager {
          * modifier entitlements that need to have their certificates regenerated
          */
         if (regenCertsAndStatuses) {
-            Collection<String> modifiedEntIds = this.entitlementCurator.batchListModifying(entsToRevoke);
-            log.debug("Regenerating certificates for modifying entitlements: {}", modifiedEntIds);
-
-            this.ecGenerator.regenerateCertificatesByEntitlementIds(modifiedEntIds,  true);
-            log.debug("Modifier entitlements done.");
+            log.debug("Regenerating modifying certificates for entitlements: {}", entsToRevoke);
+            int numOfModifiedEnts = this.entitlementCurator.markModifyingEntsDirty(entsToRevoke);
+            log.debug("Found {} modifying entitlements", numOfModifiedEnts);
         }
 
         log.info("Starting batch delete of pools");
