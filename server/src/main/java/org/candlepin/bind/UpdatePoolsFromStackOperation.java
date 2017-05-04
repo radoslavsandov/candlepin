@@ -56,11 +56,6 @@ public class UpdatePoolsFromStackOperation implements BindOperation {
     }
 
     @Override
-    public void acquireLock(BindContext context, BindChain chain) {
-        // Does nothing for now
-    }
-
-    @Override
     public void execute(BindContext context, BindChain chain) {
         if  (poolUpdates.size() > 0 || poolsToDelete.size() > 0) {
             // for (PoolUpdate update: poolUpdates) {

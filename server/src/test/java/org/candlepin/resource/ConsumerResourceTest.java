@@ -258,7 +258,8 @@ public class ConsumerResourceTest {
         CandlepinPoolManager poolManager = new CandlepinPoolManager(
             null, null, null, this.config, null, null, mockedEntitlementCurator,
             mockedConsumerCurator, null, null, null, null, mockedActivationKeyRules, null, null,
-            null, null, null, null, null, null, null
+            null, null, null, null, null, null, null, null, null,
+            null, null, null, null
         );
 
         ConsumerResource consumerResource = new ConsumerResource(

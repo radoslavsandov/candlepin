@@ -27,6 +27,14 @@ import org.candlepin.audit.EventBuilder;
 import org.candlepin.audit.EventFactory;
 import org.candlepin.audit.EventSink;
 import org.candlepin.auth.UserPrincipal;
+import org.candlepin.bind.BindContext;
+import org.candlepin.bind.BindContextFactory;
+import org.candlepin.bind.ComplianceOp;
+import org.candlepin.bind.HandleCertificatesOp;
+import org.candlepin.bind.HandleEntitlementsOp;
+import org.candlepin.bind.PostBindBonusPoolsOp;
+import org.candlepin.bind.PreEntitlementRulesCheck;
+import org.candlepin.bind.PreEntitlementRulesCheckFactory;
 import org.candlepin.common.config.Configuration;
 import org.candlepin.common.paging.Page;
 import org.candlepin.common.paging.PageRequest;
@@ -41,7 +49,6 @@ import org.candlepin.model.Entitlement;
 import org.candlepin.model.EntitlementCertificate;
 import org.candlepin.model.EntitlementCertificateCurator;
 import org.candlepin.model.EntitlementCurator;
-import org.candlepin.model.EnvironmentCurator;
 import org.candlepin.model.Eventful;
 import org.candlepin.model.Owner;
 import org.candlepin.model.OwnerContentCurator;
@@ -82,7 +89,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
@@ -130,7 +136,6 @@ public class PoolManagerTest {
     @Mock private AutobindRules autobindRules;
     @Mock private PoolRules poolRulesMock;
     @Mock private ConsumerCurator consumerCuratorMock;
-    @Mock private EnvironmentCurator envCurator;
     @Mock private EventFactory eventFactory;
     @Mock private EventBuilder eventBuilder;
     @Mock private ComplianceRules complianceRules;
@@ -141,9 +146,12 @@ public class PoolManagerTest {
     @Mock private OwnerProductCurator mockOwnerProductCurator;
     @Mock private OwnerManager mockOwnerManager;
     @Mock private PinsetterKernel pinsetterKernel;
-
-    @Captor private ArgumentCaptor<Map<String, Entitlement>> entMapCaptor;
-    @Captor private ArgumentCaptor<Map<String, Product>> productMapCaptor;
+    @Mock private BindContextFactory mockBindContextFactory;
+    @Mock private PreEntitlementRulesCheckFactory mockPreEntitlementRulesCheckFactory;
+    @Mock private HandleEntitlementsOp mockHandleEntitlementsOp;
+    @Mock private PostBindBonusPoolsOp postBindBonusPoolsOp;
+    @Mock private HandleCertificatesOp mockHandleCertificatesOp;
+    @Mock private ComplianceOp mockComplianceOp;
 
     private CandlepinPoolManager manager;
     private UserPrincipal principal;
@@ -157,6 +165,7 @@ public class PoolManagerTest {
 
     @Before
     public void init() throws Exception {
+
         i18n = I18nFactory.getI18n(getClass(), Locale.US, I18nFactory.FALLBACK);
 
         owner = TestUtil.createOwner("key", "displayname");
@@ -172,17 +181,47 @@ public class PoolManagerTest {
         when(eventBuilder.setOldEntity(any(Eventful.class))).thenReturn(eventBuilder);
 
         this.principal = TestUtil.createOwnerPrincipal(owner);
+
+        when(mockPreEntitlementRulesCheckFactory.create(any(CallerType.class)))
+            .thenAnswer(new Answer<PreEntitlementRulesCheck>() {
+                @Override
+                public PreEntitlementRulesCheck answer(InvocationOnMock invocation) throws Throwable {
+                    Object[] args = invocation.getArguments();
+                    CallerType type = (CallerType) args[0];
+                    return new PreEntitlementRulesCheck(enforcerMock, type);
+
+                }
+            });
+
+        when(mockBindContextFactory.create(any(Consumer.class), anyMapOf(String.class, Integer.class)))
+            .thenAnswer(new Answer<BindContext>() {
+                @Override
+                public BindContext answer(InvocationOnMock invocation) throws Throwable {
+                    Object[] args = invocation.getArguments();
+                    Consumer consumer = (Consumer) args[0];
+                    Map<String, Integer> quantities = (Map<String, Integer>) args[1];
+                    return new BindContext(mockPoolCurator,
+                        consumerCuratorMock,
+                        i18n,
+                        consumer,
+                        quantities);
+
+                }
+            });
         this.manager = spy(new CandlepinPoolManager(
             mockPoolCurator, mockEventSink, eventFactory, mockConfig, enforcerMock, poolRulesMock,
             entitlementCurator, consumerCuratorMock, certCuratorMock, mockECGenerator,
             complianceRules, autobindRules, activationKeyRules, mockProductCurator, mockProductManager,
             mockContentManager, mockOwnerContentCurator, mockOwnerCurator, mockOwnerProductCurator,
-            mockOwnerManager, pinsetterKernel, i18n
+            mockOwnerManager, pinsetterKernel, i18n, mockBindContextFactory,
+            mockPreEntitlementRulesCheckFactory, mockHandleEntitlementsOp, postBindBonusPoolsOp,
+            mockHandleCertificatesOp, mockComplianceOp
         ));
 
         Map<String, EntitlementCertificate> entCerts = new HashMap<String, EntitlementCertificate>();
         entCerts.put(pool.getId(), new EntitlementCertificate());
-
+        when(mockECGenerator.generateEntitlementCertificates(any(Consumer.class), any(Map.class), any(Map
+            .class), any(Map.class), eq(false))).thenReturn(entCerts);
         dummyComplianceStatus = new ComplianceStatus(new Date());
         when(complianceRules.getStatus(any(Consumer.class), any(Date.class))).thenReturn(
             dummyComplianceStatus);
@@ -961,6 +1000,9 @@ public class PoolManagerTest {
             any(PoolFilterBuilder.class), any(PageRequest.class), anyBoolean(), anyBoolean(), anyBoolean()))
             .thenReturn(page);
 
+        CandlepinQuery mockQuery = mock(CandlepinQuery.class);
+        when(mockPoolCurator.listAllByIds(any(List.class))).thenReturn(mockQuery);
+        when(mockQuery.list()).thenReturn(Arrays.asList(pool1));
         when(mockPoolCurator.lockAndLoadByIds(any(List.class))).thenReturn(Arrays.asList(pool1));
         when(enforcerMock.preEntitlement(any(Consumer.class), any(Pool.class), anyInt(),
             any(CallerType.class))).thenReturn(result);
@@ -1009,7 +1051,10 @@ public class PoolManagerTest {
             any(PoolFilterBuilder.class), any(PageRequest.class), anyBoolean(), anyBoolean(), anyBoolean()))
             .thenReturn(page);
 
-        when(mockPoolCurator.lockAndLoad(any(Pool.class))).thenReturn(pool1);
+        CandlepinQuery mockQuery = mock(CandlepinQuery.class);
+        when(mockPoolCurator.listAllByIds(any(List.class))).thenReturn(mockQuery);
+        when(mockQuery.list()).thenReturn(Arrays.asList(pool1));
+
         when(mockPoolCurator.lockAndLoadByIds(any(List.class))).thenReturn(Arrays.asList(pool1));
         when(enforcerMock.preEntitlement(any(Consumer.class), anyCollectionOf(PoolQuantity.class),
             any(CallerType.class))).thenReturn(resultMap);
@@ -1218,6 +1263,9 @@ public class PoolManagerTest {
             any(PoolFilterBuilder.class),
             any(PageRequest.class), anyBoolean(), anyBoolean(), anyBoolean()))
                 .thenReturn(page);
+        CandlepinQuery mockQuery = mock(CandlepinQuery.class);
+        when(mockPoolCurator.listAllByIds(any(Set.class))).thenReturn(mockQuery);
+        when(mockQuery.list()).thenReturn(Arrays.asList(pool1));
 
         when(mockPoolCurator.lockAndLoadByIds(anyListOf(String.class))).thenReturn(pools);
         when(enforcerMock.preEntitlement(any(Consumer.class), any(Pool.class), anyInt(),

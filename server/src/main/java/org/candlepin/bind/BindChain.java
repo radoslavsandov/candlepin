@@ -17,11 +17,13 @@ package org.candlepin.bind;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Holds and represents the binding chain of responsibility.  Inspired by the servlet filter interfaces. */
+/**
+ * Holds and represents the binding chain of responsibility.
+ * Inspired by the servlet filter interfaces.
+ */
 public class BindChain {
     private List<BindOperation> operations;
     private int preProcessIndex = -1;
-    private int lockIndex = -1;
     private int executeIndex = -1;
 
     public BindChain() {
@@ -32,13 +34,6 @@ public class BindChain {
         preProcessIndex++;
         if (preProcessIndex < operations.size()) {
             operations.get(preProcessIndex).preProcess(context, this);
-        }
-    }
-
-    public void acquireLock(BindContext context) {
-        lockIndex++;
-        if (lockIndex < operations.size()) {
-            operations.get(lockIndex).acquireLock(context, this);
         }
     }
 
@@ -53,6 +48,4 @@ public class BindChain {
     public void addOperation(BindOperation operation) {
         operations.add(operation);
     }
-
-    // TODO Implement other assorted list methods if desired.
 }

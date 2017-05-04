@@ -515,18 +515,24 @@ public class EntitlementCurator extends AbstractHibernateCurator<Entitlement> {
      * or the given start date must be before the entitlement *and* the given end date
      * must be after entitlement. (i.e. we are looking for *any* overlap)
      *
+     * also assumes the consumer is about to create an entitlement with the pool provided
+     * as an argument, so includes the products from that pool
+     *
      * @param c
-     * @param startDate
-     * @param endDate
+     * @param pool
      * @return entitled product IDs
      */
-    public Set<String> listEntitledProductIds(Consumer c, Date startDate, Date endDate) {
+    public Set<String> listEntitledProductIds(Consumer c, Pool pool) {
         // FIXME Either address the TODO below, or move this method out of the curator.
         // TODO: Swap this to a db query if we're worried about memory:
         Set<String> entitledProductIds = new HashSet<String>();
+        List<Pool> pools = new LinkedList<Pool>();
         for (Entitlement e : c.getEntitlements()) {
-            Pool p = e.getPool();
-            if (!poolOverlapsRange(p, startDate, endDate)) {
+            pools.add(e.getPool());
+        }
+        pools.add(pool);
+        for (Pool p : pools) {
+            if (!poolOverlapsRange(p, pool.getStartDate(), pool.getEndDate())) {
                 // Skip this entitlement:
                 continue;
             }
