@@ -23,7 +23,6 @@ import org.candlepin.audit.EventSink;
 import org.candlepin.common.config.Configuration;
 import org.candlepin.common.paging.Page;
 import org.candlepin.common.paging.PageRequest;
-import org.candlepin.config.ConfigProperties;
 import org.candlepin.model.Branding;
 import org.candlepin.model.CandlepinQuery;
 import org.candlepin.model.Consumer;
@@ -77,7 +76,6 @@ import org.slf4j.LoggerFactory;
 import org.xnap.commons.i18n.I18n;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -508,9 +506,8 @@ public class CandlepinPoolManager implements PoolManager {
             return;
         }
 
-        boolean lifo = !config.getBoolean(ConfigProperties.REVOKE_ENTITLEMENT_IN_FIFO_ORDER);
         List<Entitlement> freeEntitlements = this.poolCurator.retrieveFreeEntitlementsOfPools(
-            overFlowingPools, lifo);
+            overFlowingPools);
         List<Entitlement> entitlementsToDelete = new ArrayList<Entitlement>();
         Map<String, List<Entitlement>> poolSortedEntitlements = new HashMap<String, List<Entitlement>>();
 
@@ -535,8 +532,10 @@ public class CandlepinPoolManager implements PoolManager {
             Iterator<Entitlement> iter = freeEntitlementsForPool.iterator();
             while (consumed > existing && iter.hasNext()) {
                 Entitlement e = iter.next();
-                entitlementsToDelete.add(e);
-                consumed -= e.getQuantity();
+                if (!e.getConsumer().isShare()) {
+                    entitlementsToDelete.add(e);
+                    consumed -= e.getQuantity();
+                }
             }
         }
 
@@ -650,16 +649,18 @@ public class CandlepinPoolManager implements PoolManager {
             this.poolCurator.flush();
 
             // quantity has changed. delete any excess entitlements from pool
+            // the quantity has not yet been expressed on the pool itself
             if (updatedPool.getQuantityChanged()) {
-                List<Pool> existingPools = Arrays.asList(existingPool);
-                this.deleteExcessEntitlements(existingPools);
+                RevocationPlan revPlan = new RevocationPlan(poolCurator, config);
+                revPlan.setPool(existingPool);
+                revPlan.execute(this);
             }
 
             // dates changed. regenerate all entitlement certificates
             if (updatedPool.getDatesChanged() ||
                 updatedPool.getProductsChanged() ||
                 updatedPool.getBrandingChanged()) {
-                List<String> entitlements = poolCurator.retrieveFreeEntitlementIdsOfPool(existingPool, true);
+                List<String> entitlements = poolCurator.retrieveFreeEntitlementIdsOfPool(existingPool);
                 entitlementsToRegen.addAll(entitlements);
             }
 

@@ -1703,7 +1703,7 @@ public class PoolManagerTest {
             .thenReturn(new ValidationResult());
         when(mockPoolCurator.lookupOversubscribedBySubscriptionIds(any(Owner.class), anyMap()))
             .thenReturn(Arrays.asList(derivedPool));
-        when(mockPoolCurator.retrieveFreeEntitlementsOfPools(anyListOf(Pool.class), eq(true)))
+        when(mockPoolCurator.retrieveFreeEntitlementsOfPools(anyListOf(Pool.class)))
             .thenReturn(Arrays.asList(derivedEnt));
         when(mockPoolCurator.lockAndLoad(eq(derivedPool))).thenReturn(derivedPool);
         pool.setId("masterpool");
@@ -1770,7 +1770,7 @@ public class PoolManagerTest {
             .thenReturn(new ValidationResult());
         when(mockPoolCurator.lookupOversubscribedBySubscriptionIds(any(Owner.class), anyMap())).thenReturn(
             Arrays.asList(derivedPool, derivedPool2, derivedPool3));
-        when(mockPoolCurator.retrieveFreeEntitlementsOfPools(anyListOf(Pool.class), eq(true))).thenReturn(
+        when(mockPoolCurator.retrieveFreeEntitlementsOfPools(anyListOf(Pool.class))).thenReturn(
             Arrays.asList(derivedEnt, derivedEnt2, derivedEnt3));
         when(mockPoolCurator.lockAndLoad(eq(derivedPool))).thenReturn(derivedPool);
         when(mockPoolCurator.lockAndLoad(eq(derivedPool2))).thenReturn(derivedPool2);
