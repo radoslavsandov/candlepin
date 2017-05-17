@@ -15,7 +15,6 @@
 package org.candlepin.controller;
 
 import com.google.inject.persist.Transactional;
-import org.candlepin.common.config.Configuration;
 import org.candlepin.common.exceptions.ForbiddenException;
 import org.candlepin.model.Entitlement;
 import org.candlepin.model.Pool;
@@ -24,43 +23,36 @@ import org.candlepin.policy.EntitlementRefusedException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
 
 /**
  * Created by wpoteat on 5/11/17.
  */
-public class RevocationPlan {
-    private Pool pool;
-//    private long newQuantity;
-    private List<Entitlement> entitlementsToRevoke;
+public class RevocationOp {
+    private List<Pool> pools;
+    private Set<Entitlement> entitlementsToRevoke;
     private Map<Entitlement, Long> entitlementsToAdjust;
-    private Map<Pool, Long> sharedPools;
+    private Map<Pool, List<Pool>> sharedPools;
     private PoolCurator poolCurator;
-    private Configuration config;
     private long newConsumed;
 
-    public RevocationPlan(PoolCurator poolCurator, Configuration config) {
-        entitlementsToRevoke = new ArrayList<Entitlement>();
+    public RevocationOp(PoolCurator poolCurator, List<Pool> pools) {
+        entitlementsToRevoke = new HashSet<Entitlement>();
         entitlementsToAdjust = new HashMap<Entitlement, Long>();
-        sharedPools = new HashMap<Pool, Long>();
+        sharedPools = new HashMap<Pool, List<Pool>>();
         this.poolCurator = poolCurator;
-        this.config = config;
-    }
-
-    public void setPool(Pool pool) {
-        this.pool = pool;
-    }
-
-    public Pool getPool() {
-        return pool;
+        this.pools = pools;
     }
 
     public void addEntitlmentToRevoke(Entitlement entitlement) {
         entitlementsToRevoke.add(entitlement);
     }
 
-    public List<Entitlement> getEntitlementsToRevoke() {
+    public Set<Entitlement> getEntitlementsToRevoke() {
         return entitlementsToRevoke;
     }
 
@@ -82,15 +74,20 @@ public class RevocationPlan {
 
     @Transactional
     public void execute(PoolManager poolManager) {
-        pool = poolCurator.lockAndLoad(pool);
-        populateSharedPools();
-        // first determine shared pool counts where allotted units are not in use
-        boolean needsToRevoke = reduceSharedPools();
-        // if that reduction will not be enough, we then start revoking
-        if (needsToRevoke) {
-            determineExcessEntitlements();
-            poolManager.revokeEntitlements(entitlementsToRevoke);
+        for (Pool pool : pools) {
+            if (pool.isOverflowing()) {
+                pool = poolCurator.lockAndLoad(pool);
+                sharedPools.put(pool, poolCurator.listSharedPoolsOf(pool));
+                // first determine shared pool counts where allotted units are not in use
+                boolean needsToRevoke = reduceSharedPools(pool);
+                // if that reduction will not be enough, we then start revoking
+                if (needsToRevoke) {
+                    determineExcessEntitlements(pool);
+                }
+            }
         }
+        // revoke the entitlements amassed above
+        poolManager.revokeEntitlements(new ArrayList<Entitlement>(entitlementsToRevoke));
         // here is where we actually change the source entitlement quantities for the shared pools.
         // We have to wait until we get here so that share pool entitlements we want revoked are gone
         for (Entitlement entitlement : entitlementsToAdjust.keySet()) {
@@ -101,22 +98,23 @@ public class RevocationPlan {
             catch (EntitlementRefusedException e) {
                 // TODO: Could be multiple errors, but we'll just report the first one for now:
                 throw new ForbiddenException(e.getResults().values().iterator().next().getErrors()
-                    .get(0).toString());
+                        .get(0).toString());
             }
         }
+
     }
 
-    private void populateSharedPools() {
-        for (Pool sPool: poolCurator.listSharedPoolsFromMasterPool(pool)) {
-            sharedPools.put(sPool, sPool.getQuantity());
-        }
-    }
-
-    private boolean reduceSharedPools() {
+    /**
+     * The first part of the adjustment is to reduce the shared pool source entitlements for counts that are not
+     *  in use as entitlements from the shared pool.
+     *
+     * @param pool
+     * @return boolean
+     */
+    private boolean reduceSharedPools(Pool pool) {
         newConsumed = pool.getConsumed();
-        long over = pool.getConsumed() + pool.getExported() - pool.getQuantity();
-        boolean hasReduction = over > 0;
-        for (Pool sPool : sharedPools.keySet()) {
+        long over = pool.getConsumed() - pool.getQuantity();
+        for (Pool sPool : sharedPools.get(pool)) {
             if (over > 0) {
                 long excessCount = sPool.getQuantity() - sPool.getConsumed();
                 long newQuantity = 0;
@@ -133,18 +131,25 @@ public class RevocationPlan {
                         over = 0L;
                     }
                     addEntitlementToAdjust(shareEnt, newQuantity);
-                    sharedPools.put(sPool, newQuantity);
                 }
             }
         }
         return over > 0;
     }
 
-    private void determineExcessEntitlements() {
+    /**
+     * In the second part, the list of entitlements is compiled from the main pool plus the shared pools
+     * It is sorted in the order of LIFO. Entitlements are put in the revoke list until the count is
+     * acceptable for the main pool. Any entitlements that came from a shared pool are also reflected in
+     * the adjustment for the source entitlement for that shared pool.
+     *
+     * @param pool
+     */
+    private void determineExcessEntitlements(Pool pool) {
         List<Pool> pools = new ArrayList<Pool>();
         pools.add(pool);
-        pools.addAll(sharedPools.keySet());
-        List<Entitlement> freeEntitlements = this.poolCurator.retrieveFreeEntitlementsOfPools(pools);
+        pools.addAll(sharedPools.get(pool));
+        List<Entitlement> freeEntitlements = this.poolCurator.retrieveOrderedEntitlementsOf(pools);
 
         long existing = pool.getQuantity();
         for (Entitlement ent : freeEntitlements) {
@@ -152,11 +157,10 @@ public class RevocationPlan {
                 if (!ent.getConsumer().isShare()) {
                     if (ent.getPool().getType().equals(Pool.PoolType.SHARE_DERIVED)) {
                         Entitlement source = ent.getPool().getSourceEntitlement();
-                        long newQuantity = source.getQuantity();
-                        if (entitlementsToAdjust.get(source) != null) {
-                            newQuantity = entitlementsToAdjust.get(source) - ent.getQuantity();
+                        if (entitlementsToAdjust.get(source) == null) {
+                            addEntitlementToAdjust(source, source.getQuantity());
                         }
-                        addEntitlementToAdjust(source, newQuantity);
+                        addEntitlementToAdjust(source, entitlementsToAdjust.get(source) - ent.getQuantity());
                     }
                     addEntitlementToRevoke(ent);
                     newConsumed -= ent.getQuantity();

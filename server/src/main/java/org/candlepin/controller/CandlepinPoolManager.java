@@ -506,7 +506,7 @@ public class CandlepinPoolManager implements PoolManager {
             return;
         }
 
-        List<Entitlement> freeEntitlements = this.poolCurator.retrieveFreeEntitlementsOfPools(
+        List<Entitlement> freeEntitlements = this.poolCurator.retrieveOrderedEntitlementsOf(
             overFlowingPools);
         List<Entitlement> entitlementsToDelete = new ArrayList<Entitlement>();
         Map<String, List<Entitlement>> poolSortedEntitlements = new HashMap<String, List<Entitlement>>();
@@ -651,8 +651,7 @@ public class CandlepinPoolManager implements PoolManager {
             // quantity has changed. delete any excess entitlements from pool
             // the quantity has not yet been expressed on the pool itself
             if (updatedPool.getQuantityChanged()) {
-                RevocationPlan revPlan = new RevocationPlan(poolCurator, config);
-                revPlan.setPool(existingPool);
+                RevocationOp revPlan = new RevocationOp(poolCurator, Collections.singletonList(existingPool));
                 revPlan.execute(this);
             }
 
@@ -660,7 +659,7 @@ public class CandlepinPoolManager implements PoolManager {
             if (updatedPool.getDatesChanged() ||
                 updatedPool.getProductsChanged() ||
                 updatedPool.getBrandingChanged()) {
-                List<String> entitlements = poolCurator.retrieveFreeEntitlementIdsOfPool(existingPool);
+                List<String> entitlements = poolCurator.retrieveOrderedEntitlementIdsOf(existingPool);
                 entitlementsToRegen.addAll(entitlements);
             }
 
@@ -1764,7 +1763,8 @@ public class CandlepinPoolManager implements PoolManager {
                 derivedPools.add(pool);
             }
         }
-        deleteExcessEntitlements(derivedPools);
+        RevocationOp rp = new RevocationOp(poolCurator, derivedPools);
+        rp.execute(this);
     }
 
     @Override

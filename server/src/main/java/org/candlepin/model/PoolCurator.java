@@ -726,14 +726,14 @@ public class PoolCurator extends AbstractHibernateCurator<Pool> {
     }
 
     @SuppressWarnings("unchecked")
-    public List<Entitlement> retrieveFreeEntitlementsOfPools(List<Pool> existingPools) {
+    public List<Entitlement> retrieveOrderedEntitlementsOf(List<Pool> existingPools) {
         return criteriaToSelectEntitlementForPools(existingPools)
             .addOrder(Order.desc("created"))
             .list();
     }
 
     @SuppressWarnings("unchecked")
-    public List<String> retrieveFreeEntitlementIdsOfPool(Pool existingPool) {
+    public List<String> retrieveOrderedEntitlementIdsOf(Pool existingPool) {
         return criteriaToSelectEntitlementForPool(existingPool)
             .addOrder(Order.desc("created"))
             .setProjection(Projections.id())
@@ -1630,7 +1630,7 @@ public class PoolCurator extends AbstractHibernateCurator<Pool> {
     }
 
     @Transactional
-    public List<Pool> listSharedPoolsFromMasterPool(Pool pool) {
+    public List<Pool> listSharedPoolsOf(Pool pool) {
         return listByCriteria(
                 currentSession().createCriteria(Pool.class)
                     .createAlias("sourceEntitlement", "se")

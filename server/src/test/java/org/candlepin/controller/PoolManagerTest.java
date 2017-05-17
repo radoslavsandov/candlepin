@@ -1703,7 +1703,7 @@ public class PoolManagerTest {
             .thenReturn(new ValidationResult());
         when(mockPoolCurator.lookupOversubscribedBySubscriptionIds(any(Owner.class), anyMap()))
             .thenReturn(Arrays.asList(derivedPool));
-        when(mockPoolCurator.retrieveFreeEntitlementsOfPools(anyListOf(Pool.class)))
+        when(mockPoolCurator.retrieveOrderedEntitlementsOf(anyListOf(Pool.class)))
             .thenReturn(Arrays.asList(derivedEnt));
         when(mockPoolCurator.lockAndLoad(eq(derivedPool))).thenReturn(derivedPool);
         pool.setId("masterpool");
@@ -1763,17 +1763,22 @@ public class PoolManagerTest {
         // before
         assertEquals(3, derivedPool.getConsumed().intValue());
         assertEquals(2, derivedPool2.getConsumed().intValue());
-        assertEquals(2, derivedPool2.getConsumed().intValue());
+        assertEquals(2, derivedPool3.getConsumed().intValue());
 
         when(mockPoolCurator.lockAndLoad(pool)).thenReturn(pool);
         when(enforcerMock.update(any(Consumer.class), any(Entitlement.class), any(Integer.class)))
             .thenReturn(new ValidationResult());
         when(mockPoolCurator.lookupOversubscribedBySubscriptionIds(any(Owner.class), anyMap())).thenReturn(
             Arrays.asList(derivedPool, derivedPool2, derivedPool3));
-        when(mockPoolCurator.retrieveFreeEntitlementsOfPools(anyListOf(Pool.class))).thenReturn(
-            Arrays.asList(derivedEnt, derivedEnt2, derivedEnt3));
+        when(mockPoolCurator.retrieveOrderedEntitlementsOf(eq(Arrays.asList(derivedPool)))).thenReturn(
+            Arrays.asList(derivedEnt, derivedEnt2));
+        when(mockPoolCurator.retrieveOrderedEntitlementsOf(eq(Arrays.asList(derivedPool2)))).thenReturn(
+            Arrays.asList(derivedEnt3));
+        when(mockPoolCurator.retrieveOrderedEntitlementsOf(eq(Arrays.asList(derivedPool3)))).thenReturn(
+            new ArrayList<Entitlement>());
         when(mockPoolCurator.lockAndLoad(eq(derivedPool))).thenReturn(derivedPool);
         when(mockPoolCurator.lockAndLoad(eq(derivedPool2))).thenReturn(derivedPool2);
+        when(mockPoolCurator.lockAndLoad(eq(derivedPool3))).thenReturn(derivedPool3);
         pool.setId("masterpool");
 
         manager.adjustEntitlementQuantity(consumer, masterEnt, 3);
