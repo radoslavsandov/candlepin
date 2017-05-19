@@ -1906,26 +1906,16 @@ var Autobind = {
                 return true;
             },
 
-            get_num_host_specific: function() {
-                var count = 0;
+            has_host_specific_or_virt_only: function () {
+                // returns true if at least one pool has the requires_host attribute or virt-only attribute
                 for (var i = 0; i < this.pools.length; i++) {
                     var pool = this.pools[i];
-                    if (pool.getAttribute(REQUIRES_HOST_ATTRIBUTE) != null) {
-                        count++;
+                    if (pool.getAttribute(REQUIRES_HOST_ATTRIBUTE) != null
+                        || Utils.equalsIgnoreCase('true',  pool.getProductAttribute(VIRT_ONLY))) {
+                        return true;
                     }
                 }
-                return count;
-            },
-
-            get_num_virt_only: function() {
-                var count = 0;
-                for (var i = 0; i < this.pools.length; i++) {
-                    var pool = this.pools[i];
-                    if (Utils.equalsIgnoreCase('true',  pool.getProductAttribute(VIRT_ONLY))) {
-                        count++;
-                    }
-                }
-                return count;
+                return false;
             },
 
             /*
@@ -2416,12 +2406,31 @@ var Autobind = {
         var best = null;
         var total_poolquantity = Number.MAX_VALUE;
         var best_avg_prio = 0;
+        var virtual_found = false;
 
         for (var i = 0; i < all_groups.length; i++) {
             var group = all_groups[i];
             var group_avg_prio = group.get_average_priority();
             var intersection = this.get_common_products(installed, group).length;
             var group_poolquantity = group.get_total_quantity();
+            var group_has_virtual = group.has_host_specific_or_virt_only();
+            if (intersection <= 0 || (virtual_found && !group_has_virtual)) {
+                // Skip this group if there are no provided products that match
+                // or if we've seen a group that is host_specific / has virt-only attribute and this current group does
+                // not also have host_specific or virt-only pools.
+                continue;
+            }
+            // Since we'd like to prioritize pools provided by a host or virt-only pools above others, select the
+            // first group we see that has virtual and then find the best group the has_host_specific_or_virt_only
+            if (!virtual_found && group_has_virtual) {
+                stacked = group.stackable;
+                max_provide = intersection;
+                total_poolquantity = group_poolquantity;
+                best_avg_prio = group_avg_prio;
+                best = group;
+                virtual_found = true;
+                continue;
+            }
             // Choose group that provides the most installed products
             if (intersection > max_provide) {
                 stacked = group.stackable;
@@ -2429,15 +2438,18 @@ var Autobind = {
                 total_poolquantity = group_poolquantity;
                 best_avg_prio = group_avg_prio;
                 best = group;
+                continue;
             }
-            if (intersection > 0 && intersection == max_provide) {
+            if (intersection == max_provide) {
                 // Break ties with average pool priority
                 // TODO: use average priority
                 if (best_avg_prio < group_avg_prio) {
-                   best = group;
-                   stacked = group.stackable;
-                   total_poolquantity = group_poolquantity;
-                   best_avg_prio = group_avg_prio;
+                    // Since avg_prio includes higher weightings for virt-only and host_specific, groups that have more
+                    // of those pools will be chosen first.
+                    best = group;
+                    stacked = group.stackable;
+                    total_poolquantity = group_poolquantity;
+                    best_avg_prio = group_avg_prio;
                 }
                 if (best_avg_prio == group_avg_prio) {
                     // Break ties with pool quantity
